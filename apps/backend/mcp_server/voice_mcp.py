@@ -47,7 +47,7 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
 
     Args:
         voice_config: Voice settings configuration. If None, creates default config.
-        session_state: Optional SessionState for live F1 race telemetry. If None, mock data is used.
+        session_state: Optional SessionState for live F1 race telemetry. If None, attempts to get from bridge.
 
     Returns:
         Configured FastMCP server instance
@@ -59,6 +59,18 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
         voice_config = VoiceSettings(enabled=True)
 
     voice_handler = VoiceHandler(voice_config)
+
+    # If no SessionState provided, try to get from telemetry bridge
+    if session_state is None:
+        try:
+            from .mcp_telemetry_bridge import MCPTelemetryBridge
+            bridge = MCPTelemetryBridge()
+            session_state = bridge.get_session_state()
+            if session_state:
+                logger.info("✓ SessionState retrieved from telemetry bridge")
+        except Exception:
+            pass
+
     voice_state = {
         "handler": voice_handler,
         "config": voice_config,

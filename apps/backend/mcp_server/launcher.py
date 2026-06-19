@@ -26,6 +26,7 @@ import asyncio
 import logging
 import sys
 from pathlib import Path
+from typing import Optional
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
@@ -42,6 +43,7 @@ def launch_mcp_server(
     whisper_model_size: str = "base",
     port: int = 4770,
     debug: bool = False,
+    session_state: Optional["SessionState"] = None,
 ):
     """
     Launch the MCP server with specified configuration.
@@ -53,6 +55,7 @@ def launch_mcp_server(
         whisper_model_size: Whisper model size (tiny, base, small, medium, large)
         port: Port to run MCP server on
         debug: Enable debug logging
+        session_state: Optional SessionState instance for live F1 telemetry (from main app)
     """
     # Configure logging
     logging.basicConfig(
@@ -80,6 +83,10 @@ def launch_mcp_server(
     logger.info(f"Whisper Device: {whisper_device}")
     logger.info(f"Whisper Model: {whisper_model_size}")
     logger.info(f"Port: {port}")
+    if session_state:
+        logger.info("SessionState: Connected (live F1 telemetry)")
+    else:
+        logger.info("SessionState: Not available (standalone mode)")
     logger.info("=" * 70)
     logger.info("\nMCP Protocol: stdio (standard input/output)")
     logger.info("Tools available: 8")
@@ -97,7 +104,7 @@ def launch_mcp_server(
     # Run the MCP server (uses stdio by default for MCP protocol)
     try:
         from .voice_mcp import create_mcp_server
-        app = create_mcp_server(config)
+        app = create_mcp_server(config, session_state=session_state)
 
         # FastMCP.run() is synchronous and uses stdio transport by default
         # This is the correct way to run an MCP server
