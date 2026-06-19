@@ -34,6 +34,7 @@ from ..voice_layer.providers import (
     STTProviderFactory,
     TTSProviderFactory,
     LLMProvider,
+    LLMProviderFactory,
 )
 from ..voice_layer.voice_handler import VoiceHandler
 from ..state_mgmt_layer.session_state import SessionState
@@ -546,36 +547,42 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
                     search_results = search_result
                     race_context = search_result.get("results", [])
 
+            # Create LLM provider
+            llm_config = {
+                "base_url": "http://localhost:11434",  # Ollama default
+                "model": "mistral:7b-instruct",
+            }
+            llm_provider_instance = LLMProviderFactory.create(llm_provider, llm_config)
+
+            if not llm_provider_instance:
+                return {
+                    "response": None,
+                    "provider": llm_provider,
+                    "error": f"Failed to initialize {llm_provider} provider",
+                }
+
             # Construct context for LLM
             context_str = ""
             if race_context:
                 context_str = f"\n\nRace Context:\n{race_context}"
 
-            system_prompt = (
-                "You are an F1 Race Engineer AI assistant. "
-                "Provide concise, professional responses about F1 telemetry and race strategy. "
-                "Use provided race context when available to give specific, data-driven answers."
-            )
-
             user_message = f"Voice Command: {transcription}{context_str}"
 
-            # Create LLM provider dynamically
-            # Note: LLMProviderFactory not yet implemented, using placeholder
-            logger.info(
-                f"Processing voice command with {llm_provider}: {transcription}"
-            )
+            # Process with LLM
+            logger.info(f"Processing voice command with {llm_provider}: {transcription}")
+            response = await llm_provider_instance.process_command(transcription, race_context)
+            await llm_provider_instance.close()
 
             processing_time_ms = (time.time() - start_time) * 1000
 
             return {
-                "response": f"[{llm_provider}] Processing: {transcription}",
+                "response": response,
                 "provider": llm_provider,
                 "processing_time_ms": processing_time_ms,
                 "context_used": bool(race_context),
                 "auto_search_enabled": auto_search,
                 "search_results": search_results,
-                "status": "not_yet_implemented",
-                "note": "LLM provider integration coming in next phase",
+                "status": "success" if response else "failed",
             }
 
         except Exception as e:

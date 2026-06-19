@@ -340,3 +340,114 @@ class TTSProviderFactory:
         else:
             logger.warning(f"Unknown TTS provider: {provider_type}, falling back to web-speech-api")
             return None
+
+
+class OllamaLLMProvider(LLMProvider):
+    """Ollama LLM provider for local language model inference."""
+
+    def __init__(self, base_url: str = "http://localhost:11434", model: str = "mistral:7b-instruct"):
+        """
+        Initialize Ollama LLM provider.
+
+        Args:
+            base_url: Ollama server URL (default: localhost:11434)
+            model: Model name to use (default: mistral:7b-instruct)
+        """
+        self.base_url = base_url
+        self.model = model
+        self.client = None
+
+        try:
+            import aiohttp
+            self.client = aiohttp.ClientSession()
+            logger.info(f"✓ Ollama LLM: {model} @ {base_url}")
+        except ImportError:
+            logger.error("aiohttp not installed, cannot use Ollama provider")
+            self.client = None
+        except Exception as e:
+            logger.error(f"Failed to initialize Ollama client: {e}")
+
+    async def process_command(self, text: str, context: Optional[dict] = None) -> Optional[str]:
+        """
+        Process voice command through Ollama LLM.
+
+        Args:
+            text: Transcribed command text
+            context: Optional race context (driver data, telemetry, etc.)
+
+        Returns:
+            LLM response or None if failed
+        """
+        if not self.client:
+            logger.error("Ollama client not initialized")
+            return None
+
+        try:
+            # Build prompt with context if available
+            system_prompt = (
+                "You are an F1 Race Engineer AI assistant. "
+                "Provide concise, professional responses about F1 telemetry and race strategy. "
+                "Keep responses under 2 sentences."
+            )
+
+            user_message = text
+            if context:
+                user_message = f"Race Context: {context}\n\nCommand: {text}"
+
+            # Call Ollama API
+            url = f"{self.base_url}/api/generate"
+            payload = {
+                "model": self.model,
+                "prompt": f"{system_prompt}\n\nUser: {user_message}",
+                "stream": False,
+                "temperature": 0.3,
+            }
+
+            async with self.client.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response:
+                if response.status == 200:
+                    result = await response.json()
+                    return result.get("response", "No response").strip()
+                else:
+                    logger.error(f"Ollama API error: {response.status}")
+                    return None
+
+        except Exception as e:
+            logger.error(f"Ollama processing error: {e}")
+            return None
+
+    async def close(self):
+        """Close Ollama client connection."""
+        if self.client:
+            await self.client.close()
+            logger.info("✓ Ollama client closed")
+
+
+class LLMProviderFactory:
+    """Factory for creating LLM providers."""
+
+    @staticmethod
+    def create(provider_type: str, config: dict) -> Optional[LLMProvider]:
+        """
+        Create LLM provider instance.
+
+        Args:
+            provider_type: "ollama", "openai", or custom
+            config: Provider-specific configuration dict
+
+        Returns:
+            Initialized LLM provider or None if failed
+        """
+        if provider_type == "ollama":
+            return OllamaLLMProvider(
+                base_url=config.get("base_url", "http://localhost:11434"),
+                model=config.get("model", "mistral:7b-instruct"),
+            )
+
+        elif provider_type == "openai":
+            # Placeholder for OpenAI provider
+            logger.warning("OpenAI LLM provider not yet implemented")
+            return None
+
+        else:
+            logger.error(f"Unknown LLM provider: {provider_type}")
+            return None
