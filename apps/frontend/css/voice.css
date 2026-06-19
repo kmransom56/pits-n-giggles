@@ -1,0 +1,241 @@
+/**
+ * Voice Communication UI Styles
+ * Styles for voice recording controls and feedback
+ */
+
+/* Voice Button Styling */
+#voice-btn {
+    position: relative;
+    transition: all 0.3s ease;
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#voice-btn:hover:not(.recording) {
+    background-color: #5a6268;
+    transform: scale(1.05);
+}
+
+#voice-btn.recording {
+    background-color: #dc3545;
+    color: white;
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+    animation: pulse-button 1s infinite;
+}
+
+#voice-btn.recording i {
+    animation: mic-bounce 0.5s infinite alternate;
+}
+
+/* Voice Status Display */
+.voice-status {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 9999;
+    max-width: 320px;
+    display: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    font-family: 'Titillium Web', sans-serif;
+    animation-timing-function: ease-in-out;
+}
+
+/* Voice Status States */
+.voice-status.voice-status-success,
+.voice-status.voice-status-recording,
+.voice-status.voice-status-processing,
+.voice-status.voice-status-error,
+.voice-status.voice-status-info {
+    display: block;
+}
+
+.voice-status-recording {
+    background-color: #dc3545;
+    color: white;
+    animation: pulse-status-record 1s infinite;
+    border-left: 4px solid #a02830;
+}
+
+.voice-status-processing {
+    background-color: #ffc107;
+    color: #000;
+    animation: pulse-status-process 1s infinite;
+    border-left: 4px solid #d39e00;
+}
+
+.voice-status-success {
+    background-color: #198754;
+    color: white;
+    animation: slideOutRight 3s ease-out forwards;
+    border-left: 4px solid #146c43;
+}
+
+.voice-status-error {
+    background-color: #dc3545;
+    color: white;
+    border-left: 4px solid #a02830;
+}
+
+.voice-status-info {
+    background-color: #0d6efd;
+    color: white;
+    border-left: 4px solid #0b5ed7;
+}
+
+/* Animations */
+@keyframes pulse-button {
+    0%, 100% {
+        box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+    }
+    50% {
+        box-shadow: 0 0 20px rgba(220, 53, 69, 0.8);
+    }
+}
+
+@keyframes pulse-status-record {
+    0%, 100% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    50% {
+        opacity: 0.8;
+    }
+}
+
+@keyframes pulse-status-process {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes mic-bounce {
+    0% {
+        transform: scale(1);
+    }
+    100% {
+        transform: scale(1.15);
+    }
+}
+
+@keyframes slideOutRight {
+    0% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    90% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    100% {
+        opacity: 0;
+        transform: translateX(100%);
+        display: none;
+    }
+}
+
+/* Microphone Icon Breathing Animation */
+@keyframes mic-breathing {
+    0%, 100% {
+        opacity: 1;
+        filter: brightness(1);
+    }
+    50% {
+        opacity: 0.8;
+        filter: brightness(1.2);
+    }
+}
+
+#voice-btn.recording i {
+    animation: mic-breathing 1s infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .voice-status {
+        bottom: 10px;
+        left: 10px;
+        right: 10px;
+        max-width: none;
+        font-size: 12px;
+    }
+
+    #voice-btn {
+        font-size: 14px;
+        padding: 6px 10px;
+    }
+}
+
+/* Accessibility: Focus states */
+#voice-btn:focus {
+    outline: 2px solid #0d6efd;
+    outline-offset: 2px;
+}
+
+/* Voice Transcript Display (optional) */
+.voice-transcript-container {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    max-width: 400px;
+    background-color: rgba(255, 255, 255, 0.95);
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 12px 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    font-family: 'Titillium Web', sans-serif;
+    z-index: 9998;
+    display: none;
+}
+
+.voice-transcript-container.show {
+    display: block;
+    animation: slideInRight 0.3s ease-out;
+}
+
+.voice-transcript-label {
+    font-weight: 600;
+    color: #495057;
+    font-size: 11px;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.voice-transcript-text {
+    color: #212529;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+@keyframes slideInRight {
+    from {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* Disabled state */
+#voice-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#voice-btn:disabled:hover {
+    background-color: #6c757d;
+    transform: none;
+}

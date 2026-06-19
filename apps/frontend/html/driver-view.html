@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/lapSectorRecords.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tyreRecords.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/tyreDeltaToast.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/voice.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/timeTrial.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/barChart.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/columnConfig.css') }}">
@@ -69,6 +70,9 @@
               <i class="bi bi-wrench-adjustable"></i>
           </a>
           {% endif %}
+          <button id="voice-btn" class="settings-button" data-bs-toggle="tooltip" data-bs-title="Toggle voice recording">
+            <i class="bi bi-mic"></i>
+          </button>
           <button id="race-stats-btn" class="settings-button" data-bs-toggle="tooltip" data-bs-title="Show Race Stats">
             🏁
           </button>
@@ -658,6 +662,8 @@
     <script src="{{ url_for('static', filename='js/populateRaceControlMessagesTab.js') }}"></script>
     <script src="{{ url_for('static', filename='js/timeTrialDataPopulator.js') }}"></script>
     <script src="{{ url_for('static', filename='js/telemetryRenderer.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/voiceHandler.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/voiceInit.js') }}"></script>
     <script src="{{ url_for('static', filename='js/frontendUpdate.js') }}"></script>
     <script src="{{ url_for('static', filename='js/tyreDeltaToast.js') }}"></script>
     <script src="{{ url_for('static', filename='js/barChart.js') }}"></script>

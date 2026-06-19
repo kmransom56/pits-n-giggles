@@ -31,6 +31,7 @@ from apps.backend.state_mgmt_layer import SessionState
 from apps.backend.state_mgmt_layer.intf import (PeriodicUpdateData,
                                                 RaceInfoData,
                                                 StreamOverlayData)
+from apps.backend.voice_layer.voice_handler import VoiceHandler
 from lib.child_proc_mgmt import notify_parent_init_complete
 from lib.config import PngSettings
 from lib.web_server import BaseWebServer, ClientType
@@ -91,6 +92,7 @@ class TelemetryWebServer(BaseWebServer):
         self.m_show_start_sample_data = settings.StreamOverlay.show_sample_data_at_start
         self.m_session_state: SessionState = session_state
         self.m_disable_browser_autoload = settings.Display.disable_browser_autoload
+        self.m_voice_handler = VoiceHandler(settings.Voice)
 
     def define_routes(self) -> None:
         """
@@ -101,6 +103,7 @@ class TelemetryWebServer(BaseWebServer):
 
         self._defineTemplateFileRoutes()
         self._defineDataRoutes()
+        self._defineVoiceRoutes()
 
     def _defineTemplateFileRoutes(self) -> None:
         """
@@ -203,6 +206,67 @@ class TelemetryWebServer(BaseWebServer):
             """
             return StreamOverlayData(self.m_session_state, export_hud_data=True, export_pu_data=True) \
                         .toJSON(self.m_show_start_sample_data), HTTPStatus.OK
+
+    def _defineVoiceRoutes(self) -> None:
+        """
+        Define WebSocket routes for voice communication.
+
+        Sets up Socket.IO event handlers for audio streaming and transcription.
+        """
+        @self.socketio_event('voice-audio-chunk')
+        async def on_voice_audio_chunk(sid: str, data: dict) -> None:
+            """
+            Handle incoming audio chunk from client.
+
+            Args:
+                sid: Socket.IO session ID
+                data: Dictionary containing 'audio' (bytes) and 'is_final' (bool)
+            """
+            if not self.m_voice_handler.config.enabled:
+                return
+
+            try:
+                audio_bytes = data.get('audio', b'')
+                is_final = data.get('is_final', False)
+
+                # Process audio and get transcript
+                transcript = await self.m_voice_handler.process_audio_chunk(audio_bytes, is_final)
+
+                if transcript:
+                    # Send transcript back to the client who sent it
+                    await self.m_sio.emit('voice-transcript', {'text': transcript}, to=sid)
+            except Exception as e:
+                self.m_logger.error(f"Error processing voice audio chunk: {e}", exc_info=True)
+                await self.m_sio.emit('voice-error', {'error': str(e)}, to=sid)
+
+        @self.socketio_event('voice-start')
+        async def on_voice_start(sid: str) -> None:
+            """
+            Handle voice session start (reset buffer, start recording).
+
+            Args:
+                sid: Socket.IO session ID
+            """
+            if not self.m_voice_handler.config.enabled:
+                return
+
+            self.m_voice_handler.is_recording = True
+            self.m_logger.debug(f"Voice session started for client {sid}")
+
+        @self.socketio_event('voice-stop')
+        async def on_voice_stop(sid: str) -> None:
+            """
+            Handle voice session stop (process final audio).
+
+            Args:
+                sid: Socket.IO session ID
+            """
+            if not self.m_voice_handler.config.enabled:
+                return
+
+            self.m_voice_handler.is_recording = False
+            # The final chunk should have been sent with is_final=True
+            self.m_logger.debug(f"Voice session stopped for client {sid}")
 
     async def _post_start(self) -> None:
         """Function to be called after the server starts serving."""
