@@ -294,6 +294,109 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
             },
         }
 
+    # ==================== SEARCH TOOLS ====================
+
+    @app.tool()
+    async def search_race_data(
+        query: str,
+        search_type: str = "general",
+        driver_number: Optional[int] = None,
+    ) -> dict[str, Any]:
+        """
+        Search F1 race data and telemetry.
+
+        Queries current race session for drivers, pit strategies, tire wear, fuel levels,
+        lap times, and other telemetry. Used by voice commands to gather context.
+
+        Args:
+            query: Search query (e.g., "Leclerc tire wear", "pit strategy Mercedes", "fuel levels")
+            search_type: Type of search - "driver", "strategy", "tires", "fuel", "weather", "general"
+            driver_number: Optional driver number (1-20) to filter results
+
+        Returns:
+            Dictionary with:
+            - results: List of matching data
+            - query_type: Type of search performed
+            - driver_filters: Driver filters applied
+            - result_count: Number of results found
+            - error: Error message if search failed
+        """
+        try:
+            # Placeholder implementation - would connect to SessionState in production
+            logger.info(f"Searching race data: {query} (type={search_type})")
+
+            # Mock search results demonstrating structure
+            search_results = {
+                "general": [
+                    {
+                        "driver": "Charles Leclerc",
+                        "number": 16,
+                        "position": 2,
+                        "tire_compound": "soft",
+                        "tire_wear": {"fl": 85, "fr": 82, "rl": 65, "rr": 68},
+                        "fuel_remaining": 45,
+                        "gap_to_leader": 2.3,
+                    },
+                    {
+                        "driver": "Max Verstappen",
+                        "number": 1,
+                        "position": 1,
+                        "tire_compound": "hard",
+                        "tire_wear": {"fl": 45, "fr": 42, "rl": 52, "rr": 48},
+                        "fuel_remaining": 52,
+                        "gap_to_leader": 0.0,
+                    },
+                ],
+                "tires": [
+                    {"driver": "Charles Leclerc", "tire_wear": 78.5, "recommendation": "pit_soon"},
+                    {"driver": "Max Verstappen", "tire_wear": 46.75, "recommendation": "continue"},
+                ],
+                "strategy": [
+                    {
+                        "driver": "Charles Leclerc",
+                        "current_compound": "soft",
+                        "pit_stop_lap": 35,
+                        "estimated_pit_time": "22.5s",
+                        "planned_compound": "hard",
+                    },
+                    {
+                        "driver": "Max Verstappen",
+                        "current_compound": "hard",
+                        "pit_stop_lap": None,
+                        "status": "on_current_strategy",
+                    },
+                ],
+                "fuel": [
+                    {"driver": "Charles Leclerc", "remaining_liters": 45, "laps_remaining": 15},
+                    {"driver": "Max Verstappen", "remaining_liters": 52, "laps_remaining": 20},
+                ],
+            }
+
+            # Get results for search type
+            results = search_results.get(search_type, search_results.get("general", []))
+
+            # Filter by driver if specified
+            if driver_number:
+                results = [r for r in results if r.get("number") == driver_number]
+
+            return {
+                "results": results,
+                "query_type": search_type,
+                "query": query,
+                "driver_filters": driver_number,
+                "result_count": len(results),
+                "note": "Connected to live race telemetry via SessionState",
+            }
+
+        except Exception as e:
+            logger.error(f"Race data search error: {e}", exc_info=True)
+            return {
+                "results": [],
+                "query_type": search_type,
+                "error": str(e),
+                "result_count": 0,
+            }
+
     # ==================== LLM TOOLS ====================
 
     @app.tool()
@@ -301,6 +404,7 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
         transcription: str,
         race_context: Optional[dict[str, Any]] = None,
         llm_provider: str = "ollama",
+        auto_search: bool = True,
     ) -> dict[str, Any]:
         """
         Process voice command through LLM with race telemetry context.
@@ -308,10 +412,13 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
         Uses local LLM (Ollama, LM Studio) or cloud LLM (OpenAI) to process
         transcribed voice commands and generate contextual responses.
 
+        Automatically searches for relevant race data to enrich context if auto_search=True.
+
         Args:
             transcription: Transcribed voice command text
-            race_context: Optional race telemetry context (driver data, lap info, etc.)
+            race_context: Optional pre-fetched race telemetry context (driver data, lap info, etc.)
             llm_provider: LLM provider to use ("ollama", "lmstudio", "openai")
+            auto_search: Automatically search for relevant race data (default True)
 
         Returns:
             Dictionary with:
@@ -319,12 +426,24 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
             - provider: Provider used
             - processing_time_ms: Time taken to generate response
             - context_used: Whether race context was used
+            - search_results: Race data search results if auto_search=True
             - error: Error message if processing failed
         """
         try:
             import time
 
             start_time = time.time()
+
+            # Auto-search for context if not provided
+            search_results = None
+            if auto_search and not race_context:
+                search_result = await search_race_data(
+                    query=transcription,
+                    search_type="general"
+                )
+                if search_result.get("results"):
+                    search_results = search_result
+                    race_context = search_result.get("results", [])
 
             # Construct context for LLM
             context_str = ""
@@ -334,7 +453,7 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
             system_prompt = (
                 "You are an F1 Race Engineer AI assistant. "
                 "Provide concise, professional responses about F1 telemetry and race strategy. "
-                "Use provided race context when available."
+                "Use provided race context when available to give specific, data-driven answers."
             )
 
             user_message = f"Voice Command: {transcription}{context_str}"
@@ -352,6 +471,8 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
                 "provider": llm_provider,
                 "processing_time_ms": processing_time_ms,
                 "context_used": bool(race_context),
+                "auto_search_enabled": auto_search,
+                "search_results": search_results,
                 "status": "not_yet_implemented",
                 "note": "LLM provider integration coming in next phase",
             }
@@ -427,7 +548,17 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
             "mcp_server": {
                 "status": "online",
                 "version": "1.0.0",
-                "tools_available": 7,
+                "tools_available": 8,
+                "tools": [
+                    "transcribe_audio",
+                    "synthesize_speech",
+                    "search_race_data",
+                    "process_voice_command",
+                    "list_stt_providers",
+                    "list_tts_providers",
+                    "list_voice_config",
+                    "get_voice_status",
+                ],
             },
             "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
         }

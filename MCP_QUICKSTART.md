@@ -37,9 +37,10 @@ Claude will now have access to 7 voice tools! ✓
 |------|---------|
 | `transcribe_audio` | Convert audio (base64) to text |
 | `synthesize_speech` | Convert text to audio (base64) |
+| `search_race_data` | Query F1 race telemetry (drivers, strategies, tires, fuel, weather) |
+| `process_voice_command` | Process voice with auto-search + LLM context |
 | `list_stt_providers` | Query STT provider capabilities |
 | `list_tts_providers` | Query TTS provider capabilities |
-| `process_voice_command` | Process voice with LLM + race context |
 | `list_voice_config` | Get current voice configuration |
 | `get_voice_status` | Monitor system health |
 

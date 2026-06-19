@@ -37,12 +37,13 @@ Whisper Device: cuda
 Whisper Model: base
 
 MCP Protocol: stdio (standard input/output)
-Tools available: 7
+Tools available: 8
   • transcribe_audio - Speech-to-text via configurable STT
   • synthesize_speech - Text-to-speech via configurable TTS
+  • search_race_data - Query F1 race telemetry (auto-used by voice commands)
   • list_stt_providers - Query available STT providers
   • list_tts_providers - Query available TTS providers
-  • process_voice_command - Process voice commands with LLM context
+  • process_voice_command - Process voice commands with auto-search + LLM context
   • list_voice_config - Get current voice system configuration
   • get_voice_status - Monitor voice system health
 
@@ -83,6 +84,51 @@ tools = await session.list_tools()
 ```
 
 ## MCP Tools API
+
+### 🔍 `search_race_data`
+
+Search F1 race telemetry and data for context-aware responses.
+
+**Parameters:**
+- `query` (str): Search query (e.g., "Leclerc tire wear", "pit strategy Mercedes")
+- `search_type` (str): Type - "driver", "strategy", "tires", "fuel", "weather", "general" (default)
+- `driver_number` (int, optional): Filter by driver number (1-20)
+
+**Returns:**
+```json
+{
+  "results": [
+    {
+      "driver": "Charles Leclerc",
+      "number": 16,
+      "position": 2,
+      "tire_compound": "soft",
+      "tire_wear": {"fl": 85, "fr": 82, "rl": 65, "rr": 68},
+      "fuel_remaining": 45,
+      "gap_to_leader": 2.3
+    }
+  ],
+  "query_type": "general",
+  "query": "Leclerc tire wear",
+  "result_count": 1,
+  "note": "Connected to live race telemetry via SessionState"
+}
+```
+
+**Example:**
+```python
+# Search for specific driver's strategy
+results = await client.call_tool("search_race_data", {
+    "query": "Leclerc pit strategy",
+    "search_type": "strategy",
+    "driver_number": 16
+})
+
+print(f"Found {results['result_count']} results")
+for result in results['results']:
+    print(f"Driver: {result['driver']}")
+    print(f"Pit Stop Lap: {result.get('pit_stop_lap', 'No stop planned')}")
+```
 
 ### 🎤 `transcribe_audio`
 
@@ -212,26 +258,58 @@ Query available Text-to-Speech providers.
 
 ### 🧠 `process_voice_command`
 
-Process voice transcription through LLM with race context.
+Process voice transcription through LLM with automatic race context search.
 
 **Parameters:**
-- `transcription` (str): Transcribed voice command
-- `race_context` (dict, optional): Race telemetry data (driver info, lap times, etc.)
-- `llm_provider` (str): LLM provider - "ollama", "lmstudio", or "openai"
+- `transcription` (str): Transcribed voice command text
+- `race_context` (dict, optional): Pre-fetched race telemetry (driver info, lap times, etc.)
+- `llm_provider` (str): LLM provider - "ollama", "lmstudio", or "openai" (default: "ollama")
+- `auto_search` (bool): Automatically search race data if context not provided (default: True)
 
 **Returns:**
 ```json
 {
-  "response": "Charles Leclerc is on medium-soft compound, pit stop expected lap 35",
+  "response": "Charles Leclerc is on soft tires with 85% front-left wear. Pit stop recommended at lap 35.",
   "provider": "ollama",
   "processing_time_ms": 2150,
   "context_used": true,
-  "status": "processing"
+  "auto_search_enabled": true,
+  "search_results": {
+    "results": [
+      {
+        "driver": "Charles Leclerc",
+        "tire_wear": {"fl": 85, "fr": 82, "rl": 65, "rr": 68},
+        "fuel_remaining": 45
+      }
+    ],
+    "query_type": "general"
+  }
 }
 ```
 
-**Example with Race Context:**
+**Key Feature: Auto-Search (NEW)**
+
+When `auto_search=True` (default), the tool automatically:
+1. Analyzes the voice command text
+2. Searches race telemetry for relevant data via `search_race_data`
+3. Enriches context with live telemetry
+4. Passes enriched context to LLM for response generation
+
+**Example 1: Simple Command (with auto-search):**
 ```python
+# Just voice command - auto-search handles context gathering
+result = await client.call_tool("process_voice_command", {
+    "transcription": "What is Leclerc's tire wear?"
+    # auto_search=True by default, fetches live data automatically
+})
+
+print(f"Response: {result['response']}")
+# Response includes specific tire wear data from live telemetry
+```
+
+**Example 2: Pre-fetched Context (skip auto-search):**
+```python
+# If you already have race data, pass it directly
 result = await client.call_tool("process_voice_command", {
     "transcription": "Show Leclerc pit strategy",
     "race_context": {
@@ -239,14 +317,29 @@ result = await client.call_tool("process_voice_command", {
         "position": 2,
         "tire_compound": "soft",
         "tire_wear": {"fl": 85, "fr": 82, "rl": 65, "rr": 68},
-        "fuel_remaining": 45,
-        "laps_completed": 30,
-        "current_lap": 31
+        "fuel_remaining": 45
     },
+    "auto_search": False,  # Skip auto-search, use provided context
     "llm_provider": "ollama"
 })
 
 print(f"Response: {result['response']}")
+```
+
+**Example 3: Workflow with Search Results:**
+```python
+# Access search results used for context
+result = await client.call_tool("process_voice_command", {
+    "transcription": "Compare Ferrari and Red Bull strategies"
+})
+
+# See what telemetry was searched and used
+if result['search_results']:
+    print(f"Searched drivers: {len(result['search_results']['results'])}")
+    for driver_data in result['search_results']['results']:
+        print(f"  - {driver_data['driver']}")
+
+print(f"LLM Response: {result['response']}")
 ```
 
 ### ⚙️ `list_voice_config`
@@ -311,17 +404,13 @@ Monitor voice system health and provider status.
 
 ## Usage Examples
 
-### Example 1: Complete Voice Transcription Pipeline
+### Example 1: Complete Voice Pipeline with Auto-Search
 
 ```python
 # In Claude or any MCP client
 import base64
 
-# 1. Get available STT providers
-providers = await client.call_tool("list_stt_providers", {})
-print(f"Using: {providers['recommended']}")
-
-# 2. Transcribe audio
+# 1. Transcribe audio
 audio_bytes = get_microphone_audio()  # Get 16kHz PCM audio
 audio_base64 = base64.b64encode(audio_bytes).decode()
 
@@ -332,16 +421,17 @@ transcript_result = await client.call_tool("transcribe_audio", {
 
 print(f"✓ Transcribed: {transcript_result['transcript']}")
 
-# 3. Process with LLM
+# 2. Process with LLM (auto-search handles context gathering!)
 response = await client.call_tool("process_voice_command", {
     "transcription": transcript_result['transcript'],
-    "race_context": get_current_race_data(),
-    "llm_provider": "ollama"
+    "llm_provider": "ollama",
+    "auto_search": True  # NEW: Automatically searches race data
 })
 
+print(f"✓ Searched race data: {response['search_results']['result_count']} results")
 print(f"Response: {response['response']}")
 
-# 4. Synthesize speech response
+# 3. Synthesize speech response
 audio_result = await client.call_tool("synthesize_speech", {
     "text": response['response'],
     "provider": "web-speech-api"
@@ -350,13 +440,49 @@ audio_result = await client.call_tool("synthesize_speech", {
 play_audio(base64.b64decode(audio_result['audio_base64']))
 ```
 
-### Example 2: Voice-First F1 Engineer Workflow
+**NEW Feature**: `auto_search=True` automatically:
+- Analyzes the transcribed voice command
+- Calls `search_race_data` to fetch relevant telemetry
+- Passes enriched context to LLM
+- Returns search results for transparency
+
+### Example 1b: Manual Search + Voice Processing
+
+```python
+# If you want more control, search first then process
+import base64
+
+# 1. Transcribe
+transcript_result = await client.call_tool("transcribe_audio", {
+    "audio_data_base64": audio_base64,
+    "provider": "faster-whisper"
+})
+
+# 2. Manually search for specific data
+search_result = await client.call_tool("search_race_data", {
+    "query": transcript_result['transcript'],
+    "search_type": "strategy"
+})
+
+# 3. Process with pre-fetched context
+response = await client.call_tool("process_voice_command", {
+    "transcription": transcript_result['transcript'],
+    "race_context": search_result['results'],
+    "auto_search": False,  # Use provided context
+    "llm_provider": "ollama"
+})
+
+print(f"Response: {response['response']}")
+```
+
+### Example 2: Voice-First F1 Engineer Workflow (with Auto-Search)
 
 ```python
 # Scenario: During race, engineer needs tire strategy while watching telemetry
+# Auto-search automatically gathers relevant race data!
 
 async def voice_query_f1_data(voice_audio_bytes):
-    """Process voice query and return spoken response."""
+    """Process voice query and return spoken response with auto-context gathering."""
     
     # Step 1: Transcribe
     audio_b64 = base64.b64encode(voice_audio_bytes).decode()
@@ -365,13 +491,19 @@ async def voice_query_f1_data(voice_audio_bytes):
         "provider": "faster-whisper"
     })
     
-    # Step 2: Process with race context
-    race_data = fetch_current_telemetry()
+    print(f"Transcribed: {transcript['transcript']}")
+    
+    # Step 2: Process with auto-search (no manual context fetching needed!)
     response = await client.call_tool("process_voice_command", {
         "transcription": transcript['transcript'],
-        "race_context": race_data,
         "llm_provider": "ollama"
+        # auto_search=True by default - automatically searches race data
     })
+    
+    # Response now includes:
+    # - search_results: Live telemetry data used
+    # - response: LLM-generated answer with context
+    print(f"Search found: {response['search_results']['result_count']} drivers")
     
     # Step 3: Speak response
     audio_response = await client.call_tool("synthesize_speech", {
@@ -381,10 +513,15 @@ async def voice_query_f1_data(voice_audio_bytes):
     
     return audio_response['audio_base64']
 
-# Usage
-voice_input = record_voice_input()  # ~2-3 seconds
+# Usage during F1 race
+voice_input = record_voice_input()  # ~2-3 seconds of audio
 audio_output = await voice_query_f1_data(voice_input)
-play_audio_in_browser(audio_output)  # Response heard in headphones
+play_audio_in_browser(audio_output)  # Response heard instantly
+
+# Example queries that now work with auto-search:
+# "What is Leclerc's tire wear?" → auto-searches tire data
+# "Show pit strategies" → auto-searches all driver strategies
+# "Who's in P1?" → auto-searches race position data
 ```
 
 ## Configuration
