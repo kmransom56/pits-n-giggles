@@ -31,7 +31,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from lib.config.schema.voice import VoiceSettings
-from .voice_mcp import run_mcp_server
 
 logger = logging.getLogger(__name__)
 
