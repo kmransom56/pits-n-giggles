@@ -48,9 +48,9 @@ class VoiceSettings(ConfigDiffMixin, BaseModel):
         }
     )
 
-    stt_provider: Literal["openai", "google", "azure"] = Field(
+    stt_provider: Literal["openai", "faster-whisper", "google", "azure"] = Field(
         default="openai",
-        description="Speech-to-Text provider",
+        description="Speech-to-Text provider: 'openai'=cloud, 'faster-whisper'=local GPU",
         json_schema_extra={
             "ui": {
                 "type": "dropdown",
@@ -59,9 +59,9 @@ class VoiceSettings(ConfigDiffMixin, BaseModel):
         }
     )
 
-    tts_provider: Literal["web-speech-api", "google", "elevenlabs", "azure"] = Field(
+    tts_provider: Literal["web-speech-api", "pyttsx3", "google", "elevenlabs", "azure"] = Field(
         default="web-speech-api",
-        description="Text-to-Speech provider (web-speech-api runs client-side in browser)",
+        description="Text-to-Speech provider: 'web-speech-api'=browser, 'pyttsx3'=local offline",
         json_schema_extra={
             "ui": {
                 "type": "dropdown",
@@ -172,6 +172,39 @@ class VoiceSettings(ConfigDiffMixin, BaseModel):
     min_confidence: float = Field(
         default=0.7,
         description="Minimum confidence threshold for STT results (0.0-1.0)",
+        json_schema_extra={
+            "ui": {
+                "type": "number",
+                "visible": False
+            }
+        }
+    )
+
+    whisper_model_size: Literal["tiny", "base", "small", "medium", "large"] = Field(
+        default="base",
+        description="faster-whisper model size (smaller=faster, larger=more accurate)",
+        json_schema_extra={
+            "ui": {
+                "type": "dropdown",
+                "visible": False
+            }
+        }
+    )
+
+    whisper_device: Literal["cuda", "cpu"] = Field(
+        default="cuda",
+        description="Device for faster-whisper inference (cuda for GPU, cpu for CPU-only)",
+        json_schema_extra={
+            "ui": {
+                "type": "dropdown",
+                "visible": False
+            }
+        }
+    )
+
+    tts_rate: int = Field(
+        default=150,
+        description="Speech rate for pyttsx3 TTS (words per minute)",
         json_schema_extra={
             "ui": {
                 "type": "number",

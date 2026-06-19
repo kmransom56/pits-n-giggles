@@ -27,15 +27,15 @@ from typing import Optional
 
 import librosa
 import numpy as np
-from openai import AsyncOpenAI
 
 from lib.config.schema.voice import VoiceSettings
+from .providers import STTProviderFactory, TTSProviderFactory, STTProvider, TTSProvider
 
 logger = logging.getLogger(__name__)
 
 
 class VoiceHandler:
-    """Handles speech-to-text and text-to-speech voice communication."""
+    """Handles speech-to-text and text-to-speech voice communication with pluggable providers."""
 
     def __init__(self, voice_config: VoiceSettings):
         """
@@ -45,13 +45,42 @@ class VoiceHandler:
             voice_config: VoiceSettings configuration object
         """
         self.config = voice_config
-        self.openai_client: Optional[AsyncOpenAI] = None
+        self.stt_provider: Optional[STTProvider] = None
+        self.tts_provider: Optional[TTSProvider] = None
         self.audio_buffer: Optional[np.ndarray] = None
         self.is_recording = False
 
-        if voice_config.enabled and voice_config.stt_provider == "openai":
-            api_key = voice_config.api_key or None
-            self.openai_client = AsyncOpenAI(api_key=api_key)
+        # Initialize providers based on configuration
+        if voice_config.enabled:
+            self._initialize_providers()
+
+    def _initialize_providers(self) -> None:
+        """Initialize STT and TTS providers based on configuration."""
+        # Initialize STT provider
+        stt_config = {
+            "language": self.config.language,
+            "api_key": self.config.api_key or "",
+            "model_size": self.config.whisper_model_size,
+            "device": self.config.whisper_device,
+        }
+        self.stt_provider = STTProviderFactory.create(self.config.stt_provider, stt_config)
+
+        if not self.stt_provider:
+            logger.error(f"Failed to create STT provider: {self.config.stt_provider}")
+            return
+
+        logger.info(f"✓ STT Provider: {self.config.stt_provider}")
+
+        # Initialize TTS provider (if needed)
+        tts_config = {
+            "rate": self.config.tts_rate,
+        }
+        self.tts_provider = TTSProviderFactory.create(self.config.tts_provider, tts_config)
+
+        if self.config.tts_provider != "web-speech-api" and not self.tts_provider:
+            logger.warning(f"TTS provider not available: {self.config.tts_provider}")
+        else:
+            logger.info(f"✓ TTS Provider: {self.config.tts_provider}")
 
     async def process_audio_chunk(self, audio_data: bytes, is_final: bool = False) -> Optional[str]:
         """
@@ -64,7 +93,7 @@ class VoiceHandler:
         Returns:
             Transcribed text if STT succeeds, None otherwise
         """
-        if not self.config.enabled:
+        if not self.config.enabled or not self.stt_provider:
             return None
 
         try:
@@ -83,18 +112,8 @@ class VoiceHandler:
             if self.audio_buffer is None or len(self.audio_buffer) == 0:
                 return None
 
-            # Resample to 16kHz if needed
-            audio_16k = librosa.resample(
-                self.audio_buffer,
-                orig_sr=self.config.sample_rate,
-                target_sr=16000
-            )
-
-            # Convert to WAV bytes for OpenAI API
-            wav_bytes = self._audio_to_wav_bytes(audio_16k, sr=16000)
-
-            # Transcribe using OpenAI Whisper
-            transcript = await self._transcribe_whisper(wav_bytes)
+            # Transcribe using configured provider
+            transcript = await self._transcribe(self.audio_buffer, self.config.sample_rate)
 
             # Reset buffer
             self.audio_buffer = None
@@ -106,50 +125,39 @@ class VoiceHandler:
             self.audio_buffer = None
             return None
 
-    async def _transcribe_whisper(self, wav_bytes: bytes) -> Optional[str]:
+    async def _transcribe(self, audio_data: np.ndarray, sample_rate: int) -> Optional[str]:
         """
-        Transcribe audio using OpenAI Whisper API.
+        Transcribe audio using configured STT provider.
 
         Args:
-            wav_bytes: Audio data as WAV bytes
+            audio_data: Audio as numpy array (float32, [-1, 1])
+            sample_rate: Sample rate in Hz
 
         Returns:
-            Transcribed text or None if transcription fails
+            Transcribed text or None if failed
         """
-        if not self.openai_client:
-            logger.warning("OpenAI client not initialized")
+        if not self.stt_provider:
+            logger.warning("STT provider not initialized")
             return None
 
         try:
-            # Create file-like object for OpenAI API
-            audio_file = io.BytesIO(wav_bytes)
-            audio_file.name = "audio.wav"
-
-            # Call Whisper API with timeout
-            response = await asyncio.wait_for(
-                self.openai_client.audio.transcriptions.create(
-                    model="whisper-1",
-                    file=audio_file,
-                    language=self.config.language.split("-")[0],  # Extract language code (en from en-US)
-                ),
+            # Call transcription with timeout
+            transcript = await asyncio.wait_for(
+                self.stt_provider.transcribe(audio_data, sample_rate),
                 timeout=self.config.timeout_seconds
             )
 
-            text = response.text.strip()
-
-            # Only return if confidence meets threshold (Whisper doesn't provide confidence,
-            # so we do basic validation)
-            if text and len(text) > 0:
-                logger.info(f"Transcribed: {text}")
-                return text
+            if transcript and len(transcript) > 0:
+                logger.info(f"Transcribed: {transcript}")
+                return transcript
 
             return None
 
         except asyncio.TimeoutError:
-            logger.error(f"Whisper API timeout after {self.config.timeout_seconds}s")
+            logger.error(f"STT timeout after {self.config.timeout_seconds}s")
             return None
         except Exception as e:
-            logger.error(f"Whisper transcription error: {e}", exc_info=True)
+            logger.error(f"STT transcription error: {e}", exc_info=True)
             return None
 
     def _bytes_to_audio(self, audio_bytes: bytes) -> np.ndarray:
@@ -170,27 +178,9 @@ class VoiceHandler:
 
         return audio_float
 
-    def _audio_to_wav_bytes(self, audio: np.ndarray, sr: int) -> bytes:
-        """
-        Convert numpy audio array to WAV bytes.
-
-        Args:
-            audio: Audio data as numpy array (float32, [-1, 1])
-            sr: Sample rate
-
-        Returns:
-            WAV file as bytes
-        """
-        wav_buffer = io.BytesIO()
-
-        # Use soundfile to write WAV
-        import soundfile as sf
-        sf.write(wav_buffer, audio, sr, format="WAV", subtype="PCM_16")
-
-        wav_buffer.seek(0)
-        return wav_buffer.read()
-
     async def close(self):
         """Clean up resources."""
-        if self.openai_client:
-            await self.openai_client.close()
+        if self.stt_provider:
+            await self.stt_provider.close()
+        if self.tts_provider:
+            await self.tts_provider.close()

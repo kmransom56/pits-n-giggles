@@ -69,11 +69,12 @@ apps/dev_tools/    — Telemetry replayer and packet capture utilities
 
 ### Backend Layers (`apps/backend/`)
 
-The backend is structured in three layers:
+The backend is structured in four layers:
 
 1. **`telemetry_layer/`** — UDP/TCP socket reception, packet parsing (16 F1 packet types), frame gating
 2. **`state_mgmt_layer/`** — `SessionState` aggregates all parsed data; runs overtake/collision detection, tyre wear extrapolation, race analysis
 3. **`intf_layer/`** — Quart web server + Socket.IO; pushes state updates to browser clients and HUD via WebSocket; exposes REST API
+4. **`voice_layer/`** — Optional two-way voice communication; STT via OpenAI Whisper, TTS via browser Web Speech API or cloud providers; disabled by default
 
 ### Shared Library (`lib/`)
 
@@ -107,9 +108,11 @@ F1 Game (UDP/TCP)
 ### Key Files
 
 - `meta/meta.py` — Single source of version truth (`APP_VERSION`, `APP_NAME_SNAKE`)
-- `png_config.json` — Runtime config (ports, capture mode, privacy, HUD, HTTPS)
+- `png_config.json` — Runtime config (ports, capture mode, privacy, HUD, HTTPS, voice)
 - `scripts/png.spec` — PyInstaller spec (entry point, hidden imports, version injection)
-- `pyproject.toml` — Poetry deps; requires Python 3.12–3.14
+- `pyproject.toml` — Poetry deps; requires Python 3.12–3.14; includes `openai`, `librosa`, `soundfile` for voice
+- `apps/backend/voice_layer/voice_handler.py` — `VoiceHandler`; async audio chunk accumulation, OpenAI Whisper STT
+- `lib/config/schema/voice.py` — `VoiceSettings` Pydantic model; all voice configuration fields
 
 ## Procedures
 
@@ -131,3 +134,70 @@ These files define step-by-step procedures for common dev tasks. Read the releva
 - **Router/Dealer** — `IpcRouter` (server-side) paired with `IpcDealerClient`/`IpcDealerAsync` (client-side) for async many-to-one messaging.
 
 `PngAppId` enumerates all app identities; `get_free_tcp_port` allocates ports at runtime. The broker (`apps/broker/`) uses ZeroMQ independently for external multi-client forwarding.
+
+## Voice Integration
+
+Two-way voice communication layer added to the backend. **Disabled by default** — existing behaviour is unchanged without configuration.
+
+### Architecture
+
+```
+Browser microphone (Web Audio API)
+  → PCM audio chunks over WebSocket (voice_audio_chunk / voice_audio_final events)
+  → VoiceHandler (apps/backend/voice_layer/voice_handler.py) accumulates buffer
+  → OpenAI Whisper API (STT) → voice_transcript event back to browser
+  → Browser TTS (Web Speech API, free) or cloud TTS speaks the response
+```
+
+### New Files
+
+| File | Purpose |
+|------|---------|
+| `apps/backend/voice_layer/voice_handler.py` | `VoiceHandler`; async PCM buffer accumulation, Whisper STT |
+| `lib/config/schema/voice.py` | `VoiceSettings` Pydantic model |
+| `apps/frontend/js/voiceHandler.js` | Browser audio capture via Web Audio API |
+| `apps/frontend/js/voiceInit.js` | Frontend voice feature initialization |
+| `apps/frontend/css/voice.css` | Voice UI styles |
+| `VOICE_QUICKSTART.md` | Quick enable guide |
+| `VOICE_INTEGRATION.md` | Full integration reference |
+| `VOICE_IMPLEMENTATION_SUMMARY.md` | Implementation decisions |
+
+### Configuration (`png_config.json` → `voice` key)
+
+Key `VoiceSettings` fields:
+- `enabled` — `false` by default; set `true` to activate
+- `stt_provider` — `"openai"` (Whisper) | `"google"` | `"azure"`
+- `tts_provider` — `"web-speech-api"` (free, browser-side) | `"google"` | `"elevenlabs"` | `"azure"`
+- `api_key` — OpenAI API key when using Whisper STT
+- `vad_enabled` / `vad_threshold` — optional Voice Activity Detection
+- `auto_announce_enabled` — TTS announces telemetry updates automatically
+
+### Enabling Voice
+
+```json
+// png_config.json
+{
+  "voice": {
+    "enabled": true,
+    "stt_provider": "openai",
+    "api_key": "<OPENAI_API_KEY>"
+  }
+}
+```
+
+### WebSocket Events
+
+| Event | Direction | Description |
+|-------|-----------|-------------|
+| `voice_audio_chunk` | Browser → Backend | Streaming PCM audio chunk |
+| `voice_audio_final` | Browser → Backend | Last chunk; triggers STT |
+| `voice_transcript` | Backend → Browser | Transcribed text result |
+
+### Cost
+
+- **STT**: OpenAI Whisper ~$0.02/minute of audio
+- **TTS**: `web-speech-api` (default) is free and runs entirely in-browser
+
+### Python Dependencies Added
+
+`openai`, `librosa`, `soundfile` — only loaded when `voice.enabled = true`
