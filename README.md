@@ -135,3 +135,4 @@ Issues and PRs are welcome! Continuous development, minus the FIA politics.
 
 ## License
 MIT License.
+# pitsngiggles-mcp-integration
