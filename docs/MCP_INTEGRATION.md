@@ -83,6 +83,30 @@ await session.initialize()
 tools = await session.list_tools()
 ```
 
+### 3. Optional: Integrate with Live SessionState
+
+To use real race telemetry (instead of empty results), pass a `SessionState` instance to the server:
+
+```python
+from apps.backend.mcp_server.voice_mcp import create_mcp_server
+from apps.backend.state_mgmt_layer.session_state import SessionState
+from lib.config.schema.voice import VoiceSettings
+
+# Create session state (usually populated by F1 telemetry parser)
+session_state = SessionState(...)
+
+# Create server with live telemetry
+config = VoiceSettings(enabled=True)
+server = create_mcp_server(voice_config=config, session_state=session_state)
+
+# Now search_race_data queries live driver data
+server.run()
+```
+
+**Without SessionState:** `search_race_data` returns empty results with a note "No live race session available"
+
+**With SessionState:** `search_race_data` queries live F1 telemetry (driver positions, tire wear, fuel levels, pit strategy)
+
 ## MCP Tools API
 
 ### 🔍 `search_race_data`
@@ -111,7 +135,7 @@ Search F1 race telemetry and data for context-aware responses.
   "query_type": "general",
   "query": "Leclerc tire wear",
   "result_count": 1,
-  "note": "Connected to live race telemetry via SessionState"
+  "source": "live_race_telemetry"
 }
 ```
 

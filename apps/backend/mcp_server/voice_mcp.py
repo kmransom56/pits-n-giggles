@@ -36,16 +36,18 @@ from ..voice_layer.providers import (
     LLMProvider,
 )
 from ..voice_layer.voice_handler import VoiceHandler
+from ..state_mgmt_layer.session_state import SessionState
 
 logger = logging.getLogger(__name__)
 
 
-def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
+def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_state: Optional[SessionState] = None) -> FastMCP:
     """
     Create and configure FastMCP server for voice integration.
 
     Args:
         voice_config: Voice settings configuration. If None, creates default config.
+        session_state: Optional SessionState for live F1 race telemetry. If None, mock data is used.
 
     Returns:
         Configured FastMCP server instance
@@ -57,7 +59,11 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
         voice_config = VoiceSettings(enabled=True)
 
     voice_handler = VoiceHandler(voice_config)
-    voice_state = {"handler": voice_handler, "config": voice_config}
+    voice_state = {
+        "handler": voice_handler,
+        "config": voice_config,
+        "session_state": session_state
+    }
 
     # ==================== STT TOOLS ====================
 
@@ -322,62 +328,145 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
             - error: Error message if search failed
         """
         try:
-            # Placeholder implementation - would connect to SessionState in production
             logger.info(f"Searching race data: {query} (type={search_type})")
 
-            # Mock search results demonstrating structure
-            search_results = {
-                "general": [
-                    {
-                        "driver": "Charles Leclerc",
-                        "number": 16,
-                        "position": 2,
-                        "tire_compound": "soft",
-                        "tire_wear": {"fl": 85, "fr": 82, "rl": 65, "rr": 68},
-                        "fuel_remaining": 45,
-                        "gap_to_leader": 2.3,
-                    },
-                    {
-                        "driver": "Max Verstappen",
-                        "number": 1,
-                        "position": 1,
-                        "tire_compound": "hard",
-                        "tire_wear": {"fl": 45, "fr": 42, "rl": 52, "rr": 48},
-                        "fuel_remaining": 52,
-                        "gap_to_leader": 0.0,
-                    },
-                ],
-                "tires": [
-                    {"driver": "Charles Leclerc", "tire_wear": 78.5, "recommendation": "pit_soon"},
-                    {"driver": "Max Verstappen", "tire_wear": 46.75, "recommendation": "continue"},
-                ],
-                "strategy": [
-                    {
-                        "driver": "Charles Leclerc",
-                        "current_compound": "soft",
-                        "pit_stop_lap": 35,
-                        "estimated_pit_time": "22.5s",
-                        "planned_compound": "hard",
-                    },
-                    {
-                        "driver": "Max Verstappen",
-                        "current_compound": "hard",
-                        "pit_stop_lap": None,
-                        "status": "on_current_strategy",
-                    },
-                ],
-                "fuel": [
-                    {"driver": "Charles Leclerc", "remaining_liters": 45, "laps_remaining": 15},
-                    {"driver": "Max Verstappen", "remaining_liters": 52, "laps_remaining": 20},
-                ],
-            }
+            session_state = voice_state.get("session_state")
+            results = []
 
-            # Get results for search type
-            results = search_results.get(search_type, search_results.get("general", []))
+            # If no SessionState available, return empty results (mock data removed)
+            if not session_state:
+                logger.warning("No SessionState available for race data search")
+                return {
+                    "results": [],
+                    "query_type": search_type,
+                    "query": query,
+                    "driver_filters": driver_number,
+                    "result_count": 0,
+                    "note": "No live race session available",
+                }
 
-            # Filter by driver if specified
-            if driver_number:
-                results = [r for r in results if r.get("number") == driver_number]
+            # Query driver data from SessionState
+            try:
+                driver_data_list = session_state.m_driver_data
+                if not driver_data_list:
+                    return {
+                        "results": [],
+                        "query_type": search_type,
+                        "query": query,
+                        "driver_filters": driver_number,
+                        "result_count": 0,
+                    }
+
+                # Filter by search type
+                if search_type == "general":
+                    # Return all valid drivers with key telemetry
+                    for driver_data in driver_data_list:
+                        if not driver_data or not driver_data.is_valid:
+                            continue
+
+                        # Extract tire wear info
+                        tire_wear = {}
+                        if hasattr(driver_data.m_tyre_info, 'm_tyre_wear'):
+                            tw = driver_data.m_tyre_info.m_tyre_wear
+                            if tw:
+                                tire_wear = {
+                                    "fl": int(tw.m_front_left) if hasattr(tw, 'm_front_left') else 0,
+                                    "fr": int(tw.m_front_right) if hasattr(tw, 'm_front_right') else 0,
+                                    "rl": int(tw.m_rear_left) if hasattr(tw, 'm_rear_left') else 0,
+                                    "rr": int(tw.m_rear_right) if hasattr(tw, 'm_rear_right') else 0,
+                                }
+
+                        driver_entry = {
+                            "driver": driver_data.m_driver_info.name or "Unknown",
+                            "number": driver_data.m_driver_info.number or 0,
+                            "position": driver_data.m_driver_info.position or 0,
+                            "tire_compound": str(driver_data.m_tyre_info.m_visual_tyre_compound).split('.')[-1] if hasattr(driver_data.m_tyre_info, 'm_visual_tyre_compound') else "unknown",
+                            "tire_wear": tire_wear,
+                            "fuel_remaining": int(driver_data.m_car_info.m_fuel_in_tank) if hasattr(driver_data.m_car_info, 'm_fuel_in_tank') else 0,
+                        }
+
+                        if driver_number is None or driver_data.m_driver_info.number == driver_number:
+                            results.append(driver_entry)
+
+                elif search_type == "tires":
+                    # Return tire-specific data
+                    for driver_data in driver_data_list:
+                        if not driver_data or not driver_data.is_valid:
+                            continue
+
+                        # Calculate average tire wear
+                        tire_wear_avg = 0.0
+                        if hasattr(driver_data.m_tyre_info, 'm_tyre_wear'):
+                            tw = driver_data.m_tyre_info.m_tyre_wear
+                            if tw:
+                                wear_values = []
+                                if hasattr(tw, 'm_front_left'):
+                                    wear_values.append(tw.m_front_left)
+                                if hasattr(tw, 'm_front_right'):
+                                    wear_values.append(tw.m_front_right)
+                                if hasattr(tw, 'm_rear_left'):
+                                    wear_values.append(tw.m_rear_left)
+                                if hasattr(tw, 'm_rear_right'):
+                                    wear_values.append(tw.m_rear_right)
+                                tire_wear_avg = sum(wear_values) / len(wear_values) if wear_values else 0
+
+                        recommendation = "pit_soon" if tire_wear_avg > 70 else "monitor" if tire_wear_avg > 50 else "continue"
+
+                        tire_entry = {
+                            "driver": driver_data.m_driver_info.name or "Unknown",
+                            "number": driver_data.m_driver_info.number or 0,
+                            "tire_wear": round(tire_wear_avg, 1),
+                            "recommendation": recommendation,
+                        }
+
+                        if driver_number is None or driver_data.m_driver_info.number == driver_number:
+                            results.append(tire_entry)
+
+                elif search_type == "fuel":
+                    # Return fuel-specific data
+                    for driver_data in driver_data_list:
+                        if not driver_data or not driver_data.is_valid:
+                            continue
+
+                        fuel_remaining = int(driver_data.m_car_info.m_fuel_in_tank) if hasattr(driver_data.m_car_info, 'm_fuel_in_tank') else 0
+
+                        fuel_entry = {
+                            "driver": driver_data.m_driver_info.name or "Unknown",
+                            "number": driver_data.m_driver_info.number or 0,
+                            "remaining_liters": fuel_remaining,
+                        }
+
+                        if driver_number is None or driver_data.m_driver_info.number == driver_number:
+                            results.append(fuel_entry)
+
+                elif search_type == "strategy":
+                    # Return pit strategy data
+                    for driver_data in driver_data_list:
+                        if not driver_data or not driver_data.is_valid:
+                            continue
+
+                        pit_stop_info = {}
+                        if hasattr(driver_data.m_pit_info, 'm_pit_stops'):
+                            pit_stops = driver_data.m_pit_info.m_pit_stops
+                            if pit_stops:
+                                last_pit = pit_stops[-1]
+                                pit_stop_info = {
+                                    "pit_stop_lap": last_pit.m_lap if hasattr(last_pit, 'm_lap') else None,
+                                    "pit_duration": round(last_pit.m_pit_duration, 1) if hasattr(last_pit, 'm_pit_duration') else None,
+                                }
+
+                        strategy_entry = {
+                            "driver": driver_data.m_driver_info.name or "Unknown",
+                            "number": driver_data.m_driver_info.number or 0,
+                            "current_compound": str(driver_data.m_tyre_info.m_visual_tyre_compound).split('.')[-1] if hasattr(driver_data.m_tyre_info, 'm_visual_tyre_compound') else "unknown",
+                            **pit_stop_info,
+                        }
+
+                        if driver_number is None or driver_data.m_driver_info.number == driver_number:
+                            results.append(strategy_entry)
+
+            except Exception as query_error:
+                logger.warning(f"Error querying SessionState: {query_error}")
 
             return {
                 "results": results,
@@ -385,7 +474,7 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None) -> FastMCP:
                 "query": query,
                 "driver_filters": driver_number,
                 "result_count": len(results),
-                "note": "Connected to live race telemetry via SessionState",
+                "source": "live_race_telemetry" if session_state else "mock_data",
             }
 
         except Exception as e:
