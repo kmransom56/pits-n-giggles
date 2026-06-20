@@ -383,24 +383,38 @@ class OllamaLLMProvider(LLMProvider):
             return None
 
         try:
-            # Build prompt with context if available
-            system_prompt = (
-                "You are an F1 Race Engineer AI assistant. "
-                "Provide concise, professional responses about F1 telemetry and race strategy. "
-                "Keep responses under 2 sentences."
-            )
+            # Build dynamic F1 race engineer system prompt
+            system_prompt = """You are an expert F1 Race Engineer providing real-time strategic guidance. Your role is to analyze live telemetry and provide dynamic, actionable advice.
+
+Key behavioral guidelines:
+- Synthesize data into strategic advice, not just report raw numbers
+- Use professional racing language (pit window, understeer, fuel mix, DRS)
+- Make recommendations based on the data provided
+- Be conversational and natural, not robotic
+- Identify priorities: pit timing, tyre degradation, fuel strategy, pace gaps
+- Explain the "why" behind recommendations
+- Keep responses concise but informative (1-3 sentences typically)
+
+When analyzing race state:
+- Tyre wear >70%: pit window is open
+- Fuel remaining <2.5 laps: begin pit planning
+- Gap closing: consider aggressive strategy
+- Car damage: assess impact on performance
+- Pace analysis: compare to championship context
+
+Respond with practical, engineer-level advice that helps the driver make strategic decisions."""
 
             user_message = text
             if context:
-                user_message = f"Race Context: {context}\n\nCommand: {text}"
+                user_message = f"{context}\n\n[Driver Question]: {text}"
 
             # Call Ollama API
             url = f"{self.base_url}/api/generate"
             payload = {
                 "model": self.model,
-                "prompt": f"{system_prompt}\n\nUser: {user_message}",
+                "prompt": f"{system_prompt}\n\n{user_message}",
                 "stream": False,
-                "temperature": 0.3,
+                "temperature": 0.4,  # Slightly higher for more dynamic responses
             }
 
             async with self.client.post(url, json=payload, timeout=aiohttp.ClientTimeout(total=30)) as response:

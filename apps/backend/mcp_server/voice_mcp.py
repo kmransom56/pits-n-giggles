@@ -781,16 +781,33 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
                     "error": f"Failed to initialize {llm_provider} provider",
                 }
 
-            # Construct context for LLM
+            # Build enriched context with strategic analysis
+            enriched_context = None
+            session_state = voice_state.get("session_state")
+
+            if session_state and race_context:
+                # Build enriched context using strategy analyzer
+                from ..voice_layer.strategy_analyzer import RaceStrategyAnalyzer
+
+                # Compile telemetry dict from race_context
+                telemetry_data = {
+                    "race_context": race_context
+                }
+                enriched_context = RaceStrategyAnalyzer.generate_context_summary(telemetry_data)
+
+            # Construct context for LLM with enhanced information
             context_str = ""
-            if race_context:
+            if enriched_context:
+                context_str = f"\n\n=== STRATEGIC RACE CONTEXT ===\n{enriched_context}"
+            elif race_context:
                 context_str = f"\n\nRace Context:\n{race_context}"
 
-            user_message = f"Voice Command: {transcription}{context_str}"
+            # Use enriched context or fallback to basic race_context
+            llm_context = enriched_context if enriched_context else race_context
 
             # Process with LLM
             logger.info(f"Processing voice command with {llm_provider}: {transcription}")
-            response = await llm_provider_instance.process_command(transcription, race_context)
+            response = await llm_provider_instance.process_command(transcription, llm_context)
             await llm_provider_instance.close()
 
             processing_time_ms = (time.time() - start_time) * 1000

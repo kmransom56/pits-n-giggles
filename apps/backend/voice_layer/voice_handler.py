@@ -31,6 +31,7 @@ import numpy as np
 from lib.config.schema.voice import VoiceSettings
 from ..state_mgmt_layer.session_state import SessionState
 from .providers import STTProviderFactory, TTSProviderFactory, LLMProviderFactory, STTProvider, TTSProvider, LLMProvider
+from .strategy_analyzer import RaceStrategyAnalyzer, StrategyAdvice
 
 logger = logging.getLogger(__name__)
 
@@ -227,6 +228,63 @@ class VoiceHandler:
         except Exception as e:
             logger.error(f"TTS synthesis error: {e}", exc_info=True)
             return None
+
+    def build_enriched_context(self, telemetry_data: dict) -> str:
+        """
+        Build enriched race context with strategic analysis for LLM.
+
+        Args:
+            telemetry_data: Dictionary of telemetry from MCP tools
+
+        Returns:
+            Enriched context string with race state + strategic advice
+        """
+        context_lines = []
+
+        # Add race context summary
+        context_lines.append("=== RACE CONTEXT ===")
+        context_lines.append(RaceStrategyAnalyzer.generate_context_summary(telemetry_data))
+
+        # Analyze key areas and add strategic advice
+        context_lines.append("\n=== STRATEGIC ANALYSIS ===")
+
+        advice_list = []
+
+        if "tyre_wear" in telemetry_data:
+            advice = RaceStrategyAnalyzer.analyze_tyre_wear(telemetry_data["tyre_wear"])
+            if advice:
+                advice_list.append(advice)
+
+        if "fuel_info" in telemetry_data:
+            lap_num = telemetry_data.get("player_driver_info", {}).get("current_lap", 0)
+            advice = RaceStrategyAnalyzer.analyze_fuel(telemetry_data["fuel_info"], lap_num)
+            if advice:
+                advice_list.append(advice)
+
+        if "car_damage" in telemetry_data:
+            advice = RaceStrategyAnalyzer.analyze_damage(telemetry_data["car_damage"])
+            if advice:
+                advice_list.append(advice)
+
+        # Only add pace analysis if we have standings
+        if "race_table" in telemetry_data and "player_driver_info" in telemetry_data:
+            advice = RaceStrategyAnalyzer.analyze_pace(
+                telemetry_data["race_table"],
+                telemetry_data["player_driver_info"],
+            )
+            if advice:
+                advice_list.append(advice)
+
+        if advice_list:
+            for advice in sorted(advice_list, key=lambda a: (a.priority != "critical", a.priority != "warning")):
+                context_lines.append(f"[{advice.priority.upper()}] {advice.advice}")
+                context_lines.append(f"  Reason: {advice.reasoning}")
+                if advice.data_point:
+                    context_lines.append(f"  Data: {advice.data_point}")
+        else:
+            context_lines.append("No critical issues detected — maintain current strategy")
+
+        return "\n".join(context_lines)
 
     async def close(self):
         """Clean up resources."""
