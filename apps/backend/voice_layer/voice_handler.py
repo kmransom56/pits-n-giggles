@@ -29,7 +29,7 @@ import librosa
 import numpy as np
 
 from lib.config.schema.voice import VoiceSettings
-from .providers import STTProviderFactory, TTSProviderFactory, STTProvider, TTSProvider
+from .providers import STTProviderFactory, TTSProviderFactory, LLMProviderFactory, STTProvider, TTSProvider, LLMProvider
 
 logger = logging.getLogger(__name__)
 
@@ -47,8 +47,10 @@ class VoiceHandler:
         self.config = voice_config
         self.stt_provider: Optional[STTProvider] = None
         self.tts_provider: Optional[TTSProvider] = None
+        self.llm_provider: Optional[LLMProvider] = None
         self.audio_buffer: Optional[np.ndarray] = None
         self.is_recording = False
+        self._last_response: Optional[str] = None
 
         # Initialize providers based on configuration
         if voice_config.enabled:
@@ -81,6 +83,18 @@ class VoiceHandler:
             logger.warning(f"TTS provider not available: {self.config.tts_provider}")
         else:
             logger.info(f"✓ TTS Provider: {self.config.tts_provider}")
+
+        # Initialize LLM provider (if configured)
+        if hasattr(self.config, 'llm_provider') and self.config.llm_provider:
+            llm_config = {
+                "base_url": getattr(self.config, 'llm_base_url', 'http://localhost:11434'),
+                "model": getattr(self.config, 'llm_model', 'mistral'),
+            }
+            self.llm_provider = LLMProviderFactory.create(self.config.llm_provider, llm_config)
+            if self.llm_provider:
+                logger.info(f"✓ LLM Provider: {self.config.llm_provider}")
+            else:
+                logger.warning(f"Failed to initialize LLM provider: {self.config.llm_provider}")
 
     async def process_audio_chunk(self, audio_data: bytes, is_final: bool = False) -> Optional[str]:
         """
@@ -117,6 +131,15 @@ class VoiceHandler:
 
             # Reset buffer
             self.audio_buffer = None
+
+            # Process through LLM if configured
+            if transcript and self.llm_provider:
+                llm_response = await self.llm_provider.process_command(transcript)
+                if llm_response:
+                    logger.info(f"LLM Response: {llm_response}")
+                    # Store the response for later synthesis
+                    self._last_response = llm_response
+                    return f"{transcript}\n[LLM: {llm_response}]"
 
             return transcript
 
@@ -178,9 +201,35 @@ class VoiceHandler:
 
         return audio_float
 
+    async def synthesize_response(self, text: str) -> Optional[bytes]:
+        """
+        Synthesize text response to audio using TTS provider.
+
+        Args:
+            text: Text to synthesize to speech
+
+        Returns:
+            Audio bytes (WAV format) or None if failed
+        """
+        if not self.tts_provider:
+            logger.warning("TTS provider not available")
+            return None
+
+        try:
+            audio_bytes = await self.tts_provider.synthesize(text)
+            if audio_bytes:
+                logger.info(f"Synthesized {len(audio_bytes)} bytes of audio")
+                return audio_bytes
+            return None
+        except Exception as e:
+            logger.error(f"TTS synthesis error: {e}", exc_info=True)
+            return None
+
     async def close(self):
         """Clean up resources."""
         if self.stt_provider:
             await self.stt_provider.close()
         if self.tts_provider:
             await self.tts_provider.close()
+        if self.llm_provider:
+            await self.llm_provider.close()

@@ -33,7 +33,18 @@ class VoiceHandler {
             const transcript = data.text;
             console.log('Transcript:', transcript);
             this.displayTranscript(transcript);
-            this.speakTranscript(transcript);
+            this.setStatus('Received transcript...', 'processing');
+        });
+
+        /**
+         * Listen for audio response from backend (LLM + TTS)
+         */
+        this.socket.on('voice-audio-response', (data) => {
+            const audioB64 = data.audio;
+            const responseText = data.text;
+            console.log('Audio Response:', responseText);
+            this.setStatus('Playing response...', 'success');
+            this.playAudioResponse(audioB64);
         });
 
         /**
@@ -219,6 +230,37 @@ class VoiceHandler {
             this.statusText.textContent = `Transcript: ${text}`;
         }
         console.log('Displayed transcript:', text);
+    }
+
+    /**
+     * Play audio response from backend
+     * @param {string} audioBase64 - Base64-encoded audio data
+     */
+    playAudioResponse(audioBase64) {
+        try {
+            // Decode base64 to bytes
+            const binaryString = atob(audioBase64);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+
+            // Create blob and play
+            const audioBlob = new Blob([bytes], { type: 'audio/wav' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audioElement = new Audio(audioUrl);
+            audioElement.play();
+
+            audioElement.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+                this.setStatus('Ready', 'success');
+                this.micButton.classList.remove('recording');
+                this.micButton.textContent = '🎤 Voice';
+            };
+        } catch (error) {
+            console.error('Error playing audio response:', error);
+            this.setStatus('Error playing audio', 'error');
+        }
     }
 
     /**

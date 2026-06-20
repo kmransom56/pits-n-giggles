@@ -229,12 +229,26 @@ class TelemetryWebServer(BaseWebServer):
                 audio_bytes = data.get('audio', b'')
                 is_final = data.get('is_final', False)
 
-                # Process audio and get transcript
-                transcript = await self.m_voice_handler.process_audio_chunk(audio_bytes, is_final)
+                # Process audio and get transcript + LLM response
+                result = await self.m_voice_handler.process_audio_chunk(audio_bytes, is_final)
 
-                if transcript:
-                    # Send transcript back to the client who sent it
-                    await self.m_sio.emit('voice-transcript', {'text': transcript}, to=sid)
+                if result:
+                    # Send transcript back to the client
+                    await self.m_sio.emit('voice-transcript', {'text': result}, to=sid)
+
+                    # If we have an LLM response, synthesize it to audio
+                    if self.m_voice_handler._last_response:
+                        response_text = self.m_voice_handler._last_response
+                        audio_response = await self.m_voice_handler.synthesize_response(response_text)
+
+                        if audio_response:
+                            # Send audio response back to client (base64 encoded)
+                            import base64
+                            audio_b64 = base64.b64encode(audio_response).decode('utf-8')
+                            await self.m_sio.emit('voice-audio-response', {
+                                'audio': audio_b64,
+                                'text': response_text
+                            }, to=sid)
             except Exception as e:
                 self.m_logger.error(f"Error processing voice audio chunk: {e}", exc_info=True)
                 await self.m_sio.emit('voice-error', {'error': str(e)}, to=sid)
