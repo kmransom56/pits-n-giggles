@@ -45,16 +45,26 @@ logger = logging.getLogger(__name__)
 
 
 class VoiceToolRouter:
-    """Keyword-based intent router. Maps voice transcript to telemetry data fetches."""
+    """Keyword-based intent router. Maps voice transcript to telemetry data fetches from SessionState."""
 
     INTENT_MAP = [
+        # Driver-specific (tyre/fuel/damage queries — auto-resolve to player if no driver mentioned)
+        (["my tyre", "my fuel", "my damage", "player tyre", "player fuel", "player damage"], "player_specific"),
         (["tyre", "tire", "wear", "compound", "stint"], "tyre_wear"),
         (["fuel", "burn", "laps remaining", "fuel load"], "fuel"),
-        (["damage", "wing", "floor", "gearbox", "engine"], "car_damage"),
-        (["lap time", "sector", "fastest"], "lap_times"),
-        (["position", "gap", "delta", "standings"], "race_table"),
-        (["weather", "temperature", "rain", "track temp"], "session_info"),
-        (["penalty", "safety car", "pit stop", "event"], "session_events"),
+        (["damage", "wing", "floor", "gearbox", "engine", "broken", "puncture"], "car_damage"),
+
+        # Lap/session-specific
+        (["lap time", "sector", "fastest lap"], "lap_times"),
+        (["session event", "penalty", "safety car", "pit stop", "incident"], "session_events"),
+
+        # Grid/standings
+        (["drivers list", "grid", "who's racing", "field"], "drivers_list"),
+        (["position", "gap", "delta", "standings", "leader"], "race_table"),
+        (["driver info", "my info", "player info"], "player_driver_info"),
+
+        # Environment
+        (["weather", "temperature", "rain", "track temp", "conditions"], "session_info"),
     ]
 
     def classify(self, transcript: str) -> str:
@@ -66,48 +76,167 @@ class VoiceToolRouter:
         return "general"
 
     def fetch(self, intent: str, session_state: Optional[SessionState], driver_index: int = 0) -> dict[str, Any]:
-        """Fetch structured data from SessionState for the given intent."""
+        """Fetch structured data from SessionState for the given intent.
+
+        Args:
+            intent: Intent classification from classify()
+            session_state: Live SessionState object
+            driver_index: Driver index (0=player); auto-resolved for player_* intents
+        """
         if not session_state:
             return {}
 
         try:
-            if intent == "tyre_wear":
+            # Auto-resolve player index for player_* queries
+            if intent.startswith("player_"):
+                player_index = self._find_player_index(session_state)
+                if player_index is None:
+                    player_index = driver_index
+                driver_index = player_index
+
+            if intent == "tyre_wear" or intent == "player_specific":
                 if driver_index < len(session_state.m_driver_data):
                     tyre_data = session_state.m_driver_data[driver_index].m_tyre_wear_data
-                    return {
-                        "compound": tyre_data.m_compound if tyre_data else None,
-                        "age": tyre_data.m_tyre_age if tyre_data else None,
-                        "wear": list(tyre_data.m_tyre_wear) if tyre_data else None,
-                    }
+                    if tyre_data:
+                        return {
+                            "tool": "get_player_tyre_wear" if intent == "player_specific" else "get_tyre_wear",
+                            "compound": tyre_data.m_compound,
+                            "age": tyre_data.m_tyre_age,
+                            "wear": list(tyre_data.m_tyre_wear),
+                            "wear_rate": self._calc_wear_rate(tyre_data),
+                        }
+
             elif intent == "fuel":
                 if driver_index < len(session_state.m_driver_data):
                     fuel_data = session_state.m_driver_data[driver_index].m_fuel_data
+                    if fuel_data:
+                        return {
+                            "tool": "get_player_fuel_info" if intent == "player_specific" else "get_fuel_info",
+                            "remaining_kg": fuel_data.m_fuel_in_tank,
+                            "remaining_laps": fuel_data.m_fuel_remaining_laps,
+                            "capacity": fuel_data.m_fuel_capacity,
+                            "burn_rate": fuel_data.m_fuel_burn_last_lap,
+                        }
+
+            elif intent == "car_damage":
+                if driver_index < len(session_state.m_driver_data):
+                    car = session_state.m_driver_data[driver_index]
                     return {
-                        "remaining": fuel_data.m_fuel_remaining_laps if fuel_data else None,
-                        "capacity": fuel_data.m_fuel_capacity if fuel_data else None,
+                        "tool": "get_car_damage",
+                        "tyre_damage": car.m_tyre_damage,
+                        "brake_damage": car.m_brake_damage,
+                        "engine_damage": car.m_engine_damage,
+                        "wing_damage": car.m_front_wing_damage or car.m_rear_wing_damage,
                     }
+
+            elif intent == "lap_times":
+                if driver_index < len(session_state.m_driver_data):
+                    driver = session_state.m_driver_data[driver_index]
+                    return {
+                        "tool": "get_driver_lap_times",
+                        "driver_name": driver.m_driver.m_name if driver.m_driver else "Unknown",
+                        "current_lap": driver.m_current_lap_num,
+                        "last_lap_time": driver.m_last_lap_time_ms,
+                        "best_lap_time": driver.m_best_lap_time_ms,
+                        "sector_1": driver.m_sector_1_time_ms,
+                        "sector_2": driver.m_sector_2_time_ms,
+                        "sector_3": driver.m_sector_3_time_ms,
+                    }
+
+            elif intent == "session_events":
+                if driver_index < len(session_state.m_driver_data):
+                    driver = session_state.m_driver_data[driver_index]
+                    return {
+                        "tool": "get_session_events_for_driver",
+                        "driver_name": driver.m_driver.m_name if driver.m_driver else "Unknown",
+                        "penalties": driver.m_penalties,
+                        "incident_count": driver.m_total_warnings,
+                        "pit_stops": driver.m_pit_stop_count,
+                    }
+
+            elif intent == "drivers_list":
+                drivers = []
+                for i, driver in enumerate(session_state.m_driver_data[:22]):
+                    if driver.m_driver:
+                        drivers.append({
+                            "index": i,
+                            "name": driver.m_driver.m_name,
+                            "team": driver.m_driver.m_team_name,
+                            "number": driver.m_driver.m_car_number,
+                            "status": driver.m_status,
+                        })
+                return {
+                    "tool": "get_drivers_list",
+                    "drivers": drivers,
+                    "count": len(drivers),
+                }
+
             elif intent == "race_table":
                 standings = []
-                for i, driver in enumerate(session_state.m_driver_data[:20]):  # Top 20
-                    standings.append({
-                        "position": i + 1,
-                        "name": driver.m_driver.m_name if driver.m_driver else f"Driver {i}",
-                        "gap": driver.m_time_gap_to_leader,
-                    })
-                return {"standings": standings}
+                for i, driver in enumerate(session_state.m_driver_data[:20]):
+                    if driver.m_driver:
+                        standings.append({
+                            "position": i + 1,
+                            "name": driver.m_driver.m_name,
+                            "team": driver.m_driver.m_team_name,
+                            "gap_to_leader": driver.m_time_gap_to_leader,
+                            "points": driver.m_points,
+                        })
+                return {
+                    "tool": "get_race_table",
+                    "standings": standings,
+                }
+
+            elif intent == "player_driver_info":
+                player_idx = self._find_player_index(session_state)
+                if player_idx is not None and player_idx < len(session_state.m_driver_data):
+                    driver = session_state.m_driver_data[player_idx]
+                    return {
+                        "tool": "get_player_driver_info",
+                        "name": driver.m_driver.m_name if driver.m_driver else "Unknown",
+                        "team": driver.m_driver.m_team_name if driver.m_driver else "Unknown",
+                        "position": driver.m_position,
+                        "points": driver.m_points,
+                        "status": driver.m_status,
+                    }
+
             elif intent == "session_info":
                 session_info = session_state.m_session_info
-                return {
-                    "circuit": session_info.m_track_id if session_info else None,
-                    "session": session_info.m_session_type if session_info else None,
-                    "air_temp": session_info.m_air_temperature_celsius if session_info else None,
-                    "track_temp": session_info.m_track_temperature_celsius if session_info else None,
-                }
+                if session_info:
+                    return {
+                        "tool": "get_session_info",
+                        "circuit": session_info.m_track_id,
+                        "session_type": session_info.m_session_type,
+                        "air_temp": session_info.m_air_temperature_celsius,
+                        "track_temp": session_info.m_track_temperature_celsius,
+                        "weather": session_info.m_weather,
+                    }
+
         except (IndexError, AttributeError) as e:
             logger.warning(f"Error fetching {intent} data: {e}")
             return {}
 
         return {}
+
+    @staticmethod
+    def _find_player_index(session_state: SessionState) -> Optional[int]:
+        """Find the player driver index in SessionState."""
+        if not session_state or not session_state.m_driver_data:
+            return None
+        for i, driver in enumerate(session_state.m_driver_data):
+            if driver.m_driver and driver.m_driver.m_is_player:
+                return i
+        return None  # No player found; caller will use default index 0
+
+    @staticmethod
+    def _calc_wear_rate(tyre_data) -> float:
+        """Calculate average tyre wear rate (% per lap)."""
+        if not tyre_data or not hasattr(tyre_data, 'm_tyre_wear'):
+            return 0.0
+        wear = tyre_data.m_tyre_wear
+        if wear:
+            return sum(wear) / len(wear) if len(wear) > 0 else 0.0
+        return 0.0
 
 
 def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_state: Optional[SessionState] = None) -> FastMCP:
