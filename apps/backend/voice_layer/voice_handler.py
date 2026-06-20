@@ -29,6 +29,7 @@ import librosa
 import numpy as np
 
 from lib.config.schema.voice import VoiceSettings
+from ..state_mgmt_layer.session_state import SessionState
 from .providers import STTProviderFactory, TTSProviderFactory, LLMProviderFactory, STTProvider, TTSProvider, LLMProvider
 
 logger = logging.getLogger(__name__)
@@ -37,14 +38,16 @@ logger = logging.getLogger(__name__)
 class VoiceHandler:
     """Handles speech-to-text and text-to-speech voice communication with pluggable providers."""
 
-    def __init__(self, voice_config: VoiceSettings):
+    def __init__(self, voice_config: VoiceSettings, session_state: Optional[SessionState] = None):
         """
         Initialize voice handler with configuration.
 
         Args:
             voice_config: VoiceSettings configuration object
+            session_state: Optional SessionState for live telemetry context in voice commands
         """
         self.config = voice_config
+        self.session_state = session_state
         self.stt_provider: Optional[STTProvider] = None
         self.tts_provider: Optional[TTSProvider] = None
         self.llm_provider: Optional[LLMProvider] = None

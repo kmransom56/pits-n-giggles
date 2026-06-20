@@ -92,7 +92,7 @@ class TelemetryWebServer(BaseWebServer):
         self.m_show_start_sample_data = settings.StreamOverlay.show_sample_data_at_start
         self.m_session_state: SessionState = session_state
         self.m_disable_browser_autoload = settings.Display.disable_browser_autoload
-        self.m_voice_handler = VoiceHandler(settings.Voice)
+        self.m_voice_handler = VoiceHandler(settings.Voice, session_state=session_state)
 
     def define_routes(self) -> None:
         """

@@ -44,6 +44,72 @@ from .metrics import record_voice_tool
 logger = logging.getLogger(__name__)
 
 
+class VoiceToolRouter:
+    """Keyword-based intent router. Maps voice transcript to telemetry data fetches."""
+
+    INTENT_MAP = [
+        (["tyre", "tire", "wear", "compound", "stint"], "tyre_wear"),
+        (["fuel", "burn", "laps remaining", "fuel load"], "fuel"),
+        (["damage", "wing", "floor", "gearbox", "engine"], "car_damage"),
+        (["lap time", "sector", "fastest"], "lap_times"),
+        (["position", "gap", "delta", "standings"], "race_table"),
+        (["weather", "temperature", "rain", "track temp"], "session_info"),
+        (["penalty", "safety car", "pit stop", "event"], "session_events"),
+    ]
+
+    def classify(self, transcript: str) -> str:
+        """Return intent string from transcript keyword match, or 'general'."""
+        lower = transcript.lower()
+        for keywords, intent in self.INTENT_MAP:
+            if any(kw in lower for kw in keywords):
+                return intent
+        return "general"
+
+    def fetch(self, intent: str, session_state: Optional[SessionState], driver_index: int = 0) -> dict[str, Any]:
+        """Fetch structured data from SessionState for the given intent."""
+        if not session_state:
+            return {}
+
+        try:
+            if intent == "tyre_wear":
+                if driver_index < len(session_state.m_driver_data):
+                    tyre_data = session_state.m_driver_data[driver_index].m_tyre_wear_data
+                    return {
+                        "compound": tyre_data.m_compound if tyre_data else None,
+                        "age": tyre_data.m_tyre_age if tyre_data else None,
+                        "wear": list(tyre_data.m_tyre_wear) if tyre_data else None,
+                    }
+            elif intent == "fuel":
+                if driver_index < len(session_state.m_driver_data):
+                    fuel_data = session_state.m_driver_data[driver_index].m_fuel_data
+                    return {
+                        "remaining": fuel_data.m_fuel_remaining_laps if fuel_data else None,
+                        "capacity": fuel_data.m_fuel_capacity if fuel_data else None,
+                    }
+            elif intent == "race_table":
+                standings = []
+                for i, driver in enumerate(session_state.m_driver_data[:20]):  # Top 20
+                    standings.append({
+                        "position": i + 1,
+                        "name": driver.m_driver.m_name if driver.m_driver else f"Driver {i}",
+                        "gap": driver.m_time_gap_to_leader,
+                    })
+                return {"standings": standings}
+            elif intent == "session_info":
+                session_info = session_state.m_session_info
+                return {
+                    "circuit": session_info.m_track_id if session_info else None,
+                    "session": session_info.m_session_type if session_info else None,
+                    "air_temp": session_info.m_air_temperature_celsius if session_info else None,
+                    "track_temp": session_info.m_track_temperature_celsius if session_info else None,
+                }
+        except (IndexError, AttributeError) as e:
+            logger.warning(f"Error fetching {intent} data: {e}")
+            return {}
+
+        return {}
+
+
 def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_state: Optional[SessionState] = None) -> FastMCP:
     """
     Create and configure FastMCP server for voice integration.
@@ -544,23 +610,38 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
 
             start_time = time.time()
 
-            # Auto-search for context if not provided
+            # Auto-search for context if not provided (use VoiceToolRouter)
             search_results = None
             if auto_search and not race_context:
-                search_result = await search_race_data(
-                    query=transcription,
-                    search_type="general"
-                )
-                if search_result.get("results"):
-                    search_results = search_result
-                    race_context = search_result.get("results", [])
+                router = VoiceToolRouter()
+                intent = router.classify(transcription)
+                telemetry_context = router.fetch(intent, voice_state.get("session_state"))
 
-            # Create LLM provider
+                if telemetry_context:
+                    search_results = {
+                        "intent": intent,
+                        "data": telemetry_context,
+                    }
+                    race_context = telemetry_context
+                else:
+                    # Fallback to search_race_data if router can't fetch
+                    search_result = await search_race_data(
+                        query=transcription,
+                        search_type="general"
+                    )
+                    if search_result.get("results"):
+                        search_results = search_result
+                        race_context = search_result.get("results", [])
+
+            # Create LLM provider using configured URLs
             llm_config = {
-                "base_url": "http://localhost:11434",  # Ollama default
-                "model": "mistral:7b-instruct",
+                "base_url": voice_state["config"].llm_base_url or "http://localhost:11434",
+                "model": voice_state["config"].llm_model or "mistral",
             }
-            llm_provider_instance = LLMProviderFactory.create(llm_provider, llm_config)
+            llm_provider_instance = LLMProviderFactory.create(
+                voice_state["config"].llm_provider or "ollama",
+                llm_config
+            )
 
             if not llm_provider_instance:
                 duration_ms = (time.time() - start_time) * 1000
