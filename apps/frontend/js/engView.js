@@ -2760,6 +2760,8 @@ function initDashboard() {
     window.modalManager = new ModalManager(driverModal, settingsModal, raceStatsModal);
 
     const socketio = initializeSocketIO('race-table', 'eng-view');
+    window.socket = socketio;
+    window.socketIO = socketio;
 
     socketio.on('race-table-update', (binaryData) => {
         let data;

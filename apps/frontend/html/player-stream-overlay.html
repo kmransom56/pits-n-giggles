@@ -328,6 +328,8 @@
         const sampleStreamOverlayJSON = getDefaultOverlayData();
         let firstDataReceived = false;
         const socketio = initializeSocketIO('player-stream-overlay', 'stream-overlay');
+        window.socket = socketio;
+        window.socketIO = socketio;
         const iconCache = new IconCache();
         const carTelemetryWidget = new CarTelemetryWidget();
         const gForceDisplayWidget = new GForceDisplay('gforce-display');

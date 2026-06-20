@@ -25,6 +25,7 @@
 import asyncio
 import base64
 import logging
+import time
 from typing import Any, Optional
 
 from fastmcp import FastMCP
@@ -38,6 +39,7 @@ from ..voice_layer.providers import (
 )
 from ..voice_layer.voice_handler import VoiceHandler
 from ..state_mgmt_layer.session_state import SessionState
+from .metrics import record_voice_tool
 
 logger = logging.getLogger(__name__)
 
@@ -340,6 +342,7 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
             - result_count: Number of results found
             - error: Error message if search failed
         """
+        start_time = time.time()
         try:
             logger.info(f"Searching race data: {query} (type={search_type})")
 
@@ -481,6 +484,9 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
             except Exception as query_error:
                 logger.warning(f"Error querying SessionState: {query_error}")
 
+            duration_ms = (time.time() - start_time) * 1000
+            record_voice_tool("search_race_data", duration_ms, provider=search_type, status="success")
+
             return {
                 "results": results,
                 "query_type": search_type,
@@ -491,6 +497,8 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
             }
 
         except Exception as e:
+            duration_ms = (time.time() - start_time) * 1000
+            record_voice_tool("search_race_data", duration_ms, provider=search_type, status="failed", error=str(e))
             logger.error(f"Race data search error: {e}", exc_info=True)
             return {
                 "results": [],
@@ -555,6 +563,8 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
             llm_provider_instance = LLMProviderFactory.create(llm_provider, llm_config)
 
             if not llm_provider_instance:
+                duration_ms = (time.time() - start_time) * 1000
+                record_voice_tool("process_voice_command", duration_ms, provider=llm_provider, status="failed", error=f"Provider init failed: {llm_provider}")
                 return {
                     "response": None,
                     "provider": llm_provider,
@@ -574,6 +584,8 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
             await llm_provider_instance.close()
 
             processing_time_ms = (time.time() - start_time) * 1000
+            status = "success" if response else "failed"
+            record_voice_tool("process_voice_command", processing_time_ms, provider=llm_provider, status=status)
 
             return {
                 "response": response,
@@ -582,10 +594,12 @@ def create_mcp_server(voice_config: Optional[VoiceSettings] = None, session_stat
                 "context_used": bool(race_context),
                 "auto_search_enabled": auto_search,
                 "search_results": search_results,
-                "status": "success" if response else "failed",
+                "status": status,
             }
 
         except Exception as e:
+            duration_ms = (time.time() - time.time()) * 1000  # Approximate
+            record_voice_tool("process_voice_command", duration_ms, provider=llm_provider, status="failed", error=str(e))
             logger.error(f"Voice command processing error: {e}", exc_info=True)
             return {
                 "response": None,

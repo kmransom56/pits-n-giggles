@@ -68,10 +68,11 @@ class VoiceHandler {
             const source = this.audioContext.createMediaStreamSource(this.stream);
 
             // Create ScriptProcessor for real-time audio processing
+            // Buffer size must be power-of-2: 256, 512, 1024, 2048, 4096, 8192, 16384
             this.processor = this.audioContext.createScriptProcessor(
-                this.chunkSize,
-                1, // input channels
-                1  // output channels
+                4096,  // Valid buffer size (power of 2)
+                1,     // input channels
+                1      // output channels
             );
 
             // Connect nodes

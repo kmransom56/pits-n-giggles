@@ -192,6 +192,8 @@
             const label = document.getElementById('trackLabel');
 
             const socketio = initializeSocketIO('race-table', 'eng-view-trackmap');
+            window.socket = socketio;
+            window.socketIO = socketio;
 
             let refDriverTeam = null;
 

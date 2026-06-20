@@ -26,6 +26,8 @@ if (window.SESSION_SLUG) {
         .catch(err => console.error('Failed to load telemetry info:', err));
 } else {
     socketio = initializeSocketIO('race-table', 'driver-view');
+    window.socket = socketio;
+    window.socketIO = socketio;
 
     socketio.on('race-table-update', function (binaryData) {
         try {
