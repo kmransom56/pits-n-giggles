@@ -49,7 +49,7 @@ class VoiceSettings(ConfigDiffMixin, BaseModel):
     )
 
     stt_provider: Literal["openai", "faster-whisper", "google", "azure"] = Field(
-        default="openai",
+        default="faster-whisper",
         description="Speech-to-Text provider: 'openai'=cloud, 'faster-whisper'=local GPU",
         json_schema_extra={
             "ui": {
