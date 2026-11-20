@@ -294,8 +294,9 @@ def main():
         lags = json.load(open(lag_file)); res["mcp_loop_lag"] = summ(lags)
     except Exception as e:
         res["mcp_loop_lag"] = str(e)
-    with open(f"{OUT}/mcp_{int(rate)}hz.json", "w") as f: json.dump(res, f, indent=1, default=str)
-    print(json.dumps(res, indent=1, default=str)[:6000])
+    name = "voice_direct" if os.environ.get("VOICE_ONLY") else "mcp"
+    with open(f"{OUT}/{name}_{int(rate)}hz.json", "w") as f: json.dump(res, f, indent=1, default=str)
+    print(json.dumps(res, indent=1, default=str))
     p2.terminate(); p1.terminate()
 
 

@@ -1,0 +1,318 @@
+{
+ "cpu": 2,
+ "piper_load_s": 0.424,
+ "piper": {
+  "ack": {
+   "chars": 9,
+   "time_to_first_chunk_s": {
+    "n": 5,
+    "p50": 0.047,
+    "min": 0.039,
+    "max": 0.11,
+    "mean": 0.058
+   },
+   "synth_total_s": {
+    "n": 5,
+    "p50": 0.047,
+    "min": 0.039,
+    "max": 0.111,
+    "mean": 0.058
+   },
+   "audio_s": 0.89,
+   "rtf": 0.053
+  },
+  "short": {
+   "chars": 53,
+   "time_to_first_chunk_s": {
+    "n": 5,
+    "p50": 0.187,
+    "min": 0.157,
+    "max": 0.247,
+    "mean": 0.197
+   },
+   "synth_total_s": {
+    "n": 5,
+    "p50": 0.187,
+    "min": 0.157,
+    "max": 0.247,
+    "mean": 0.197
+   },
+   "audio_s": 3.74,
+   "rtf": 0.05
+  },
+  "medium": {
+   "chars": 100,
+   "time_to_first_chunk_s": {
+    "n": 5,
+    "p50": 0.087,
+    "min": 0.082,
+    "max": 0.095,
+    "mean": 0.087
+   },
+   "synth_total_s": {
+    "n": 5,
+    "p50": 0.306,
+    "min": 0.291,
+    "max": 0.32,
+    "mean": 0.304
+   },
+   "audio_s": 6.95,
+   "rtf": 0.044
+  },
+  "long": {
+   "chars": 228,
+   "time_to_first_chunk_s": {
+    "n": 5,
+    "p50": 0.034,
+    "min": 0.032,
+    "max": 0.037,
+    "mean": 0.034
+   },
+   "synth_total_s": {
+    "n": 5,
+    "p50": 0.805,
+    "min": 0.697,
+    "max": 0.842,
+    "mean": 0.782
+   },
+   "audio_s": 15.72,
+   "rtf": 0.051
+  }
+ },
+ "whisper": {
+  "tiny.en@2t": {
+   "load_s": 0.76,
+   "latency_s": {
+    "n": 12,
+    "p50": 0.348,
+    "min": 0.33,
+    "max": 0.494,
+    "mean": 0.364
+   },
+   "transcripts": [
+    {
+     "ref": "Radio, what is my tyre wear?",
+     "hyp": "Radio, what is my tyre where?",
+     "audio_s": 2.12
+    },
+    {
+     "ref": "Engineer, how much fuel do I have?",
+     "hyp": "Engineer, how much fuel do I have?",
+     "audio_s": 2.68
+    },
+    {
+     "ref": "Radio, what's the gap to the car behind?",
+     "hyp": "Radio, wets the gap to the car behind.",
+     "audio_s": 2.58
+    },
+    {
+     "ref": "Radio, should I box for inters?",
+     "hyp": "Radio, should I box for inters?",
+     "audio_s": 2.6
+    }
+   ]
+  },
+  "base.en@2t": {
+   "load_s": 0.55,
+   "latency_s": {
+    "n": 12,
+    "p50": 0.605,
+    "min": 0.569,
+    "max": 0.671,
+    "mean": 0.604
+   },
+   "transcripts": [
+    {
+     "ref": "Radio, what is my tyre wear?",
+     "hyp": "Radio, what is my tyre where?",
+     "audio_s": 2.12
+    },
+    {
+     "ref": "Engineer, how much fuel do I have?",
+     "hyp": "Engineer, how much fuel do I have?",
+     "audio_s": 2.68
+    },
+    {
+     "ref": "Radio, what's the gap to the car behind?",
+     "hyp": "Radio, wets the gap to the car behind.",
+     "audio_s": 2.58
+    },
+    {
+     "ref": "Radio, should I box for inters?",
+     "hyp": "Radio, should I box for inters.",
+     "audio_s": 2.6
+    }
+   ]
+  },
+  "small.en@2t": {
+   "load_s": 1.75,
+   "latency_s": {
+    "n": 12,
+    "p50": 1.817,
+    "min": 1.73,
+    "max": 1.981,
+    "mean": 1.824
+   },
+   "transcripts": [
+    {
+     "ref": "Radio, what is my tyre wear?",
+     "hyp": "Radio, what is my tyre wear?",
+     "audio_s": 2.12
+    },
+    {
+     "ref": "Engineer, how much fuel do I have?",
+     "hyp": "Engineer, how much fuel do I have?",
+     "audio_s": 2.68
+    },
+    {
+     "ref": "Radio, what's the gap to the car behind?",
+     "hyp": "Radio, what's the gap to the car behind?",
+     "audio_s": 2.58
+    },
+    {
+     "ref": "Radio, should I box for inters?",
+     "hyp": "Radio, should I box for inters?",
+     "audio_s": 2.6
+    }
+   ]
+  }
+ },
+ "selector_prompt_chars": 1405,
+ "ollama": {
+  "qwen2.5:1.5b": {
+   "selector_runs": [
+    {
+     "wall_s": 7.97,
+     "load_s": 2.83,
+     "prompt_tokens": 386,
+     "prompt_eval_s": 4.87,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 19.09,
+     "response": "wet-crossover"
+    },
+    {
+     "wall_s": 0.38,
+     "load_s": 0.0,
+     "prompt_tokens": 386,
+     "prompt_eval_s": 0.07,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 16.78,
+     "response": "wet-crossover"
+    },
+    {
+     "wall_s": 0.36,
+     "load_s": 0.0,
+     "prompt_tokens": 386,
+     "prompt_eval_s": 0.07,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 17.88,
+     "response": "wet-crossover"
+    },
+    {
+     "wall_s": 0.37,
+     "load_s": 0.0,
+     "prompt_tokens": 386,
+     "prompt_eval_s": 0.06,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 16.76,
+     "response": "wet-crossover"
+    }
+   ],
+   "freeform_40tok": {
+    "wall_s": 4.67,
+    "gen_tok_per_s": 15.99,
+    "text": "The driver should pit for inters as the tyres are 31% worn and the rain is 5%, indicating a need for tire change and possibly additional fuel."
+   }
+  },
+  "llama3.2:3b": {
+   "selector_runs": [
+    {
+     "wall_s": 15.94,
+     "load_s": 5.36,
+     "prompt_tokens": 359,
+     "prompt_eval_s": 9.9,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 7.43,
+     "response": "wet-crossover"
+    },
+    {
+     "wall_s": 0.69,
+     "load_s": 0.0,
+     "prompt_tokens": 359,
+     "prompt_eval_s": 0.13,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 9.07,
+     "response": "wet-crossover"
+    },
+    {
+     "wall_s": 0.66,
+     "load_s": 0.0,
+     "prompt_tokens": 359,
+     "prompt_eval_s": 0.13,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 9.49,
+     "response": "wet-crossover"
+    },
+    {
+     "wall_s": 0.66,
+     "load_s": 0.0,
+     "prompt_tokens": 359,
+     "prompt_eval_s": 0.13,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 9.53,
+     "response": "wet-crossover"
+    }
+   ],
+   "freeform_40tok": {
+    "wall_s": 9.98,
+    "gen_tok_per_s": 7.66,
+    "text": "No, the driver should not pit for inters as the current tyre wear is relatively low (31%) and the rain percentage is only 5%, indicating a relatively dry track "
+   }
+  },
+  "llama3.1:8b": {
+   "selector_runs": [
+    {
+     "wall_s": 34.4,
+     "load_s": 10.96,
+     "prompt_tokens": 344,
+     "prompt_eval_s": 22.1,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 3.79,
+     "response": "wet-crossover"
+    },
+    {
+     "wall_s": 1.5,
+     "load_s": 0.01,
+     "prompt_tokens": 344,
+     "prompt_eval_s": 0.32,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 4.34,
+     "response": "wet-crossover"
+    },
+    {
+     "wall_s": 1.5,
+     "load_s": 0.0,
+     "prompt_tokens": 344,
+     "prompt_eval_s": 0.28,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 4.13,
+     "response": "wet-crossover"
+    },
+    {
+     "wall_s": 1.48,
+     "load_s": 0.0,
+     "prompt_tokens": 344,
+     "prompt_eval_s": 0.28,
+     "gen_tokens": 5,
+     "gen_tok_per_s": 4.2,
+     "response": "wet-crossover"
+    }
+   ],
+   "freeform_40tok": {
+    "wall_s": 21.72,
+    "gen_tok_per_s": 3.72,
+    "text": "No, the driver should not pit for inters, the rain probability is too low and the tyres are not worn enough to warrant a change."
+   }
+  }
+ }
+}

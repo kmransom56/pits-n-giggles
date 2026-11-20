@@ -1,0 +1,71 @@
+{
+ "voice_direct:tyres": {
+  "n": 80,
+  "p50_ms": 219.88,
+  "p95_ms": 285.84,
+  "p99_ms": 319.74,
+  "mean_ms": 190.03,
+  "max_ms": 320.57,
+  "success_rate": 0.613,
+  "ok_p50_ms": 125.5,
+  "reasons": {
+   "None": 49,
+   "Incoherent session/player cache generation": 31
+  },
+  "sample_answer": "Current compound: Medium. Age 9 laps. FL 33.1% wear. FR 35.2% wear. RL 28% wear. RR 29.6% wear."
+ },
+ "voice_direct:fuel": {
+  "n": 80,
+  "p50_ms": 127.59,
+  "p95_ms": 248.7,
+  "p99_ms": 278.12,
+  "mean_ms": 171.34,
+  "max_ms": 330.26,
+  "success_rate": 0.7,
+  "ok_p50_ms": 114.3,
+  "reasons": {
+   "Incoherent session/player cache generation": 24,
+   "None": 56
+  },
+  "sample_answer": "Fuel remaining: 41.2 kg. Fuel surplus (game estimate): 0.8 laps."
+ },
+ "voice_direct:gaps": {
+  "n": 80,
+  "p50_ms": 97.85,
+  "p95_ms": 113.94,
+  "p99_ms": 129.14,
+  "mean_ms": 100.12,
+  "max_ms": 130.54,
+  "success_rate": 1.0,
+  "ok_p50_ms": 97.8,
+  "reasons": {
+   "None": 80
+  },
+  "sample_answer": "Driver4 is P5. Cannot report seconds or closing rate: same-lap timing compatibility is unavailable."
+ },
+ "voice_direct:pit": {
+  "n": 80,
+  "p50_ms": 256.6,
+  "p95_ms": 289.86,
+  "p99_ms": 313.63,
+  "mean_ms": 227.83,
+  "max_ms": 364.63,
+  "success_rate": 0.55,
+  "ok_p50_ms": 142.6,
+  "reasons": {
+   "None": 44,
+   "Incoherent session/player cache generation": 36
+  },
+  "sample_answer": "Cannot predict a pit window, rejoin position or optimal pit lap: pit-loss, pit-state and window inputs are unavailable. Current compound: Medium. Age 9 laps. FL 33.1% wear. FR 35.2% wear. RL 28% wear. RR 29.6% wear. Fuel remaining: 41.2 kg. Fuel surplus (game estimate): 0.8 laps."
+ },
+ "publish_rate_hz": 10.0,
+ "payload_bytes": 37864,
+ "mcp_loop_lag": {
+  "n": 6000,
+  "p50_ms": 0.31,
+  "p95_ms": 13.73,
+  "p99_ms": 18.01,
+  "mean_ms": 1.96,
+  "max_ms": 117.49
+ }
+}

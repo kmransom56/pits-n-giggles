@@ -1,0 +1,110 @@
+{
+ "llama3.1:8b": {
+  "current_order": [
+   {
+    "total_s": 28.29,
+    "prompt_eval_tokens": 408,
+    "prompt_eval_s": 26.94,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 18.98,
+    "prompt_eval_tokens": 408,
+    "prompt_eval_s": 17.1,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 18.49,
+    "prompt_eval_tokens": 408,
+    "prompt_eval_s": 17.16,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 18.53,
+    "prompt_eval_tokens": 408,
+    "prompt_eval_s": 17.11,
+    "resp": "wet-crossover"
+   }
+  ],
+  "static_prefix_first": [
+   {
+    "total_s": 23.67,
+    "prompt_eval_tokens": 463,
+    "prompt_eval_s": 22.37,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 11.97,
+    "prompt_eval_tokens": 464,
+    "prompt_eval_s": 10.84,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 11.97,
+    "prompt_eval_tokens": 463,
+    "prompt_eval_s": 10.76,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 11.85,
+    "prompt_eval_tokens": 463,
+    "prompt_eval_s": 10.61,
+    "resp": "wet-crossover"
+   }
+  ]
+ },
+ "llama3.2:3b": {
+  "current_order": [
+   {
+    "total_s": 11.1,
+    "prompt_eval_tokens": 423,
+    "prompt_eval_s": 10.49,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 7.6,
+    "prompt_eval_tokens": 423,
+    "prompt_eval_s": 6.96,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 7.57,
+    "prompt_eval_tokens": 423,
+    "prompt_eval_s": 6.99,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 7.65,
+    "prompt_eval_tokens": 422,
+    "prompt_eval_s": 7.03,
+    "resp": "wet-crossover"
+   }
+  ],
+  "static_prefix_first": [
+   {
+    "total_s": 10.16,
+    "prompt_eval_tokens": 479,
+    "prompt_eval_s": 9.56,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 4.94,
+    "prompt_eval_tokens": 479,
+    "prompt_eval_s": 4.4,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 5.0,
+    "prompt_eval_tokens": 478,
+    "prompt_eval_s": 4.46,
+    "resp": "wet-crossover"
+   },
+   {
+    "total_s": 4.88,
+    "prompt_eval_tokens": 479,
+    "prompt_eval_s": 4.34,
+    "resp": "wet-crossover"
+   }
+  ]
+ }
+}
