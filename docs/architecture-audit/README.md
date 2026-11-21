@@ -1,22 +1,28 @@
 # Pits n' Giggles MCP and Voice Architecture Audit
 
-Audit date: 19 November 2026
-Scope: [kmransom56/pits-n-giggles](https://github.com/kmransom56/pits-n-giggles) at `main` 3490db9 (v4.4.2), `feat/voice-assistant` d856557 ([PR #351](https://github.com/ashwin-nat/pits-n-giggles/pull/351)), `feat/voice-assistant-v5` 0a6fcde, and `release-v5.0.0` d3d58a2. The `kmransom56/pitsngiggles-mcp-integration` repository returns HTTP 404 on GitHub and is not in your repository listing, so it is no longer reachable from this account (deleted, renamed, or moved to Gitea). Its role is covered from the voice code that now lives in the fork (`apps/voice`) and from your earlier project notes (Piper/Whisper sidecar, port 8765 Node bridge, Windows `Start-RaceEngineer.ps1` with `llama-server` on port 8080).
+Audit date: 19 November 2026 (status updated 21 November 2026 after rebasing onto `feat/voice-assistant-v5` f20ffb9)
+Scope: [kmransom56/pits-n-giggles](https://github.com/kmransom56/pits-n-giggles) at `main` 3490db9 (v4.4.2), `feat/voice-assistant` d856557 ([PR #351](https://github.com/ashwin-nat/pits-n-giggles/pull/351)), `feat/voice-assistant-v5` 0a6fcde (now f20ffb9), and `release-v5.0.0` d3d58a2. The `kmransom56/pitsngiggles-mcp-integration` repository returns HTTP 404 on GitHub and is not in your repository listing, so it is no longer reachable from this account (deleted, renamed, or moved to Gitea). Its role is covered from the voice code that now lives in the fork (`apps/voice`) and from your earlier project notes (Piper/Whisper sidecar, port 8765 Node bridge, Windows `Start-RaceEngineer.ps1` with `llama-server` on port 8080).
 
 ---
 
 ## 1. Executive summary
 
+> **Status update, 21 November 2026.** Two findings are resolved on `feat/voice-assistant-v5` (f20ffb9):
+> - **F4 (Piper on Windows): resolved by b059220.** When `pw-play` and `paplay` are missing, `Speaker` now plays Piper's PCM in-process through PyAudio. A new `apps/voice/paths.py` resolves `models/` and `png_voice.json` from the repo, from next to a PyInstaller executable, or from `PNG_VOICE_HOME`. Microphone selection (`select_headset_mic`) still relies on `pactl`, so on Windows it uses the default input.
+> - **F8 (stale lock file): resolved by 0a6fcde.** `poetry check --lock` passes, and running `poetry lock` with Poetry 2.5.1 leaves the file byte-for-byte unchanged. The separate lint failure (the runner image doesn't offer Python 3.13.3) is a CI infrastructure issue, not a code issue.
+>
+> All other findings are still open. The 20 Hz MCP results in §6.2 and §6.3 were re-measured on the rebased branch.
+
 | # | Finding | Severity | Evidence |
 |---|---|---|---|
-| F1 | The voice telemetry adapter fails its cross-tool coherence check when the race table updates mid-collection. Tyre/fuel/pit answers succeed 91–98% at the default 5 Hz, 55–70% at 10 Hz and **0% at 20 Hz**. | High | Benchmark §6.3 |
+| F1 | The voice telemetry adapter fails its cross-tool coherence check when the race table updates mid-collection. Tyre/fuel/pit answers succeed 91–98% at the default 5 Hz, 55–70% at 10 Hz and **0–9% at 20 Hz**. | High | Benchmark §6.3 |
 | F2 | The default complex-question model (`llama3.1:8b`) takes **18.5 s warm** per selector call on 2 vCPU, against a hard 8 s budget, so complex questions always fall back to "Insufficient verified data." | High | §6.5 |
 | F3 | The selector prompt puts changing timestamps ahead of the static knowledge cards, which defeats Ollama's prompt-prefix cache. Moving static content first cuts warm latency by **35%** (8B: 18.5 → 11.9 s; 3B: 7.6 → 4.9 s). | Medium (easy win) | §6.5 |
-| F4 | On Windows, Piper never plays audio. `tts.py` only pipes PCM into `pw-play` or `paplay` (PipeWire/PulseAudio), so it drops to `pyttsx3` (SAPI). `select_headset_mic` uses `pactl` and does nothing on Windows. | High for your Windows target | `apps/voice/tts.py`, `voice_controller.py` |
+| F4 | ~~On Windows, Piper never plays audio. `tts.py` only pipes PCM into `pw-play` or `paplay` (PipeWire/PulseAudio), so it drops to `pyttsx3` (SAPI). `select_headset_mic` uses `pactl` and does nothing on Windows.~~ **Resolved in b059220:** Piper now plays through PyAudio on Windows. Mic selection is still Linux-only. | ~~High~~ Resolved | `apps/voice/tts.py`, `voice_controller.py` |
 | F5 | The branch hard-codes Ollama `/api/generate` on port 11434. Your Windows runtime uses `llama-server` (OpenAI-compatible) on port 8080. | Medium | `engineer.py` DEFAULT_CONFIG |
 | F6 | Voice runs as threads inside the Qt launcher process rather than as a managed subsystem: no heartbeat, stats, crash isolation or restart. `launcher.py` imports `VoiceController` at module load even when `--voice` is off. | Medium | launcher diff |
 | F7 | MCP event-loop lag is p99 ≈ 135 ms, max ≈ 380 ms, under tool load. Tool handlers run synchronous JSON shaping and output-schema validation on the same loop as the IPC subscriber. | Medium | §6.2 |
-| F8 | PR #351 CI is red because `poetry.lock` is stale (unit tests) and the runner image lacks Python 3.13.3 (lint). The code itself is fine: all **277 voice unit tests pass** locally. | Low | CI logs, local pytest |
+| F8 | ~~PR #351 CI is red because `poetry.lock` is stale (unit tests)~~ **Lock resolved in 0a6fcde.** The lint job still fails because the runner image lacks Python 3.13.3, which is CI infrastructure. On the rebased branch, **491 tests pass** locally (voice, session-state and subsystem suites). | ~~Low~~ Resolved (lock) | CI logs, local pytest |
 | F9 | Cloud and optional dependencies (`google-genai`, `edge-tts`, `PyAudio`, `pyttsx3`, `faster-whisper`, `piper-tts`) are added to base `dependencies`, which makes every install and PyInstaller bundle bigger. | Low | `pyproject.toml` |
 
 ---
@@ -110,7 +116,7 @@ Mic → speech_recognition.listen (pause 0.6 s) → WhisperSTT (faster-whisper i
         ├─ classify() → TelemetryAdapter.collect() over MCP HTTP (sequential tool calls)
         ├─ direct topics → answer_direct() (no LLM)
         └─ complex → build_context() → Ollama /api/generate (num_predict 8) → reviewed card id
-    → revalidate_answer() → Speaker.say() (Piper → pw-play/paplay; fallback pyttsx3)
+    → revalidate_answer() → Speaker.say() (Piper → pw-play/paplay, or in-process PyAudio since b059220; fallback pyttsx3)
 Side producers: TelemetryWatcher (own thread + loop, MCP poll 1–5 s), RaceControlAnnouncer (thread, HTTP /race-info every 2 s)
 ```
 
@@ -120,7 +126,7 @@ Thread and loop inventory for one `--voice` launch: VoiceListen, VoiceWork, Loca
 
 | Hook | Where | Why |
 |---|---|---|
-| **H1 – TTS backend interface** | Replace `Speaker._say_piper`'s hard-coded `pw-play`/`paplay` with an `AudioSink` protocol: `PipeWireSink`, `PulseSink`, `SoundDeviceSink` (PortAudio/WASAPI for Windows), and `NullSink` for tests. | Fixes F4. Piper already yields `audio_int16_bytes` per sentence, so a `sounddevice.RawOutputStream` can stream it directly with no subprocess. |
+| **H1 – TTS backend interface** | Replace `Speaker._say_piper`'s hard-coded `pw-play`/`paplay` with an `AudioSink` protocol: `PipeWireSink`, `PulseSink`, `SoundDeviceSink` (PortAudio/WASAPI for Windows), and `NullSink` for tests. | F4 itself is fixed by b059220's PyAudio path. A sink interface is still worth having for cancellation (H5) and device selection on Windows. Piper already yields `audio_int16_bytes` per sentence, so a `sounddevice.RawOutputStream` can stream it directly with no subprocess. |
 | **H2 – Sentence-level streaming** | In `VoiceController._deliver`, call the TTS per sentence as soon as each one is available. `ask_stream` already yields `Answer` objects, so make direct answers yield one per sentence. | Piper's first chunk takes 34–190 ms, but whole-answer synthesis grows linearly (0.8 s for a 228-character answer). Streaming caps time-to-first-audio at about one sentence. |
 | **H3 – Pre-rendered acks** | Cache the PCM for "Go ahead.", "Radio check. Engineer ready.", "Radio busy…" at start-up. | Removes 47 ms or more from the most latency-sensitive replies. |
 | **H4 – Event-driven callouts** | Have the voice subsystem subscribe to the existing pub/sub topic `race-table-update` instead of `TelemetryWatcher` polling MCP. Race-control events can come from the backend over the dealer (`race-info-request`) instead of HTTP GET to the web process. | Removes two polling loops and the dependency on the web process, and gives one coherent snapshot per message (see F1). |
@@ -196,16 +202,16 @@ Takeaways:
 
 - Transport overhead dominates: even a 93-byte reply costs about 14 ms of HTTP, JSON-RPC and validation, against under 1 ms for IPC.
 - `get_race_table` costs about 3× a small tool, roughly in proportion to payload size.
-- Results at 20 Hz were within 5% of 5 Hz. Publish rate does not affect tool latency, but it does affect coherence (next section).
+- Results at 20 Hz were within 5% of 5 Hz. A re-run at 20 Hz on the rebased v5 branch (f20ffb9, 21 November) agreed: tool p50s were within 1 ms (for example, `get_race_table` 50.0 ms, `get_car_damage` 30.3 ms) and MCP loop lag was p99 127 ms, max 404 ms. Publish rate does not affect tool latency, but it does affect coherence (next section).
 
 ### 6.3 Voice telemetry collection: coherence versus publish rate (n=80 per cell)
 
-| Topic (MCP calls) | 5 Hz (default) | 10 Hz | 20 Hz | p50 latency at 5 Hz |
+| Topic (MCP calls) | 5 Hz (default) | 10 Hz | 20 Hz (v5 re-run) | p50 latency at 5 Hz |
 |---|---|---|---|---|
 | gaps (3) | 100% | 100% | 100% | 98 ms |
-| fuel (4) | 100% | 70% | **0%** | 121 ms |
-| tyres (4) | 97.5% | 61% | **0%** | 122 ms |
-| pit (5) | 91% | 55% | **0%** | 148 ms |
+| fuel (4) | 100% | 70% | **8.7%** (first run: 0%) | 121 ms |
+| tyres (4) | 97.5% | 61% | **2.5%** (first run: 0%) | 122 ms |
+| pit (5) | 91% | 55% | **0%** (first run: 0%) | 148 ms |
 
 The failure reason is always `Incoherent session/player cache generation`. `collect()` requires each player tool's `last-update-timestamp` to equal the race table's. A new publish between the sequential calls breaks that, and the single retry hits the same race. The failure rate is roughly the collection window divided by the publish period. This is safe, since it refuses rather than speaking stale data, but it gets worse with anything that raises `local_telemetry_rate` or slows MCP. H8, or a direct pub/sub subscription (H4), fixes it.
 
@@ -261,7 +267,8 @@ Measured components on 2 vCPU:
 ### 6.7 Tests and CI
 
 - Running `pytest tests/tests_voice_*.py -n 2` locally gives **277 passed** in 3.3 s.
-- In PR #351 CI, the unit-test jobs fail at `poetry install` with "pyproject.toml changed significantly since poetry.lock was last generated". `feat/voice-assistant-v5` already contains the lock refresh (0a6fcde).
+- In PR #351 CI, the unit-test jobs fail at `poetry install` with "pyproject.toml changed significantly since poetry.lock was last generated". **Resolved:** `feat/voice-assistant-v5` contains the lock refresh (0a6fcde). On f20ffb9, `poetry check --lock` passes and `poetry lock` (2.5.1) leaves the file unchanged.
+- On the rebased branch, `pytest tests/tests_voice_*.py tests/tests_session_state tests/tests_subsystem -n 2` gives **491 passed, 9 xfailed**. That includes the new `tests_voice_windows.py`.
 - The lint jobs fail because the runner image (Ubuntu 26.04) does not offer Python 3.13.3. That is infrastructure, not code.
 
 ---
@@ -270,9 +277,9 @@ Measured components on 2 vCPU:
 
 | Priority | Change | Fixes | Acceptance check |
 |---|---|---|---|
-| P0 | Rebase PR #351 on the v5 branch or refresh `poetry.lock`; move voice dependencies to `[project.optional-dependencies].voice`; lazy-import `VoiceController` | F8, F9, part of F6 | CI green; `pip install .` pulls no audio or ML wheels |
-| P0 | Add the `get_player_radio_snapshot` composite tool (H8) and switch `TelemetryAdapter` to it | F1 | ≥ 99.5% success for tyres/fuel/pit at 5, 10 and 20 Hz with the harness in `bench/` |
-| P0 | `AudioSink` abstraction with a `sounddevice` WASAPI sink (H1) | F4 | Piper audible on Windows 11; `pyttsx3` used only as last resort |
+| P0 | ~~Rebase PR #351 on the v5 branch or refresh `poetry.lock`~~ (done); move voice dependencies to `[project.optional-dependencies].voice`; lazy-import `VoiceController` | ~~F8~~, F9, part of F6 | CI green; `pip install .` pulls no audio or ML wheels |
+| P0 | Add the `get_player_radio_snapshot` composite tool (H8) and switch `TelemetryAdapter` to it | F1 | ≥ 99.5% success for tyres/fuel/pit at 5, 10 and 20 Hz with the harness in `scripts/bench_mcp_voice/` |
+| ~~P0~~ Done | ~~`AudioSink` abstraction with a `sounddevice` WASAPI sink (H1)~~ Delivered as PyAudio playback in b059220 | ~~F4~~ | Piper audible on Windows 11 (still needs a check on real hardware) |
 | P1 | Reorder the selector prompt, default to 3B on CPU, warm at start-up | F2, F3 | Warm realistic selector p95 < 6 s on the target PC |
 | P1 | `SelectorBackend` with an OpenAI-compatible `llama-server` option (H7) | F5 | `Start-RaceEngineer.ps1` port 8080 works with no Ollama installed |
 | P1 | Voice as a v5 `AsyncSubsystem` plus `VoiceMgr`; pub/sub-driven watcher (H4, H6) | F6 | Launcher stats show a VOICE subsystem; killing it does not affect the HUD or web |
