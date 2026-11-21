@@ -19,6 +19,16 @@ os.makedirs(OUT, exist_ok=True)
 log = logging.getLogger("bench"); log.addHandler(logging.NullHandler())
 
 
+def _app_ids():
+    """Router identities: PngAppId (v4.x, lib.ipc) or PngSubsysId (v5, lib.subsystem.identity)."""
+    try:
+        from lib.ipc import PngAppId
+        return PngAppId
+    except ImportError:
+        from lib.subsystem.identity import PngSubsysId
+        return PngSubsysId
+
+
 def make_row(i, player=False):
     return {
         "driver-info": {"index": i, "name": f"Driver{i}", "position": i + 1, "is-player": player,
@@ -76,7 +86,8 @@ def driver_info_reply(idx):
 
 # ------------------------------------------------------------------ P1 core
 def core_proc(rate_hz, ready):
-    from lib.ipc import IpcPubSubBroker, IpcRouter, IpcPublisherAsync, IpcDealerAsync, PngAppId
+    from lib.ipc import IpcPubSubBroker, IpcRouter, IpcPublisherAsync, IpcDealerAsync
+    PngAppId = _app_ids()
     broker = IpcPubSubBroker(xsub_port=XSUB, xpub_port=XPUB, logger=log); broker.run_in_thread()
     router = IpcRouter(port=ROUTER, logger=log); router.run_in_thread()
 
@@ -103,8 +114,10 @@ def core_proc(rate_hz, ready):
 
 # ------------------------------------------------------------------ P2 mcp
 def mcp_proc(ready, lag_file):
-    from lib.ipc import IpcDealerAsync, PngAppId
-    from apps.mcp_server.subscriber import init_subscriber_task
+    import inspect
+    from lib.ipc import IpcDealerAsync, IpcSubscriberAsync
+    PngAppId = _app_ids()
+    from apps.mcp_server import subscriber as mcp_sub
     from apps.mcp_server.mcp_server import MCPBridge
 
     async def lag_probe():
@@ -117,10 +130,19 @@ def mcp_proc(ready, lag_file):
 
     async def main():
         tasks = []
-        init_subscriber_task(port=XPUB, logger=log, tasks=tasks)
+        if hasattr(mcp_sub, "init_subscriber_task"):      # v4.x: McpSubscriber owns its socket
+            mcp_sub.init_subscriber_task(port=XPUB, logger=log, tasks=tasks)
+        else:                                             # v5: subsystem base owns the socket
+            raw = IpcSubscriberAsync(port=XPUB, logger=log)
+            wrapped = mcp_sub.McpSubscriber(raw, timeout=10.0)
+            tasks.append(asyncio.create_task(raw.run(), name="IPC Subscriber Task"))
+            tasks.append(asyncio.create_task(wrapped.m_wdt.run(), name="IPC Watchdog Task"))
         dealer = IpcDealerAsync(port=ROUTER, identity=str(PngAppId.MCP), logger=log)
         tasks.append(asyncio.create_task(dealer.start()))
-        bridge = MCPBridge(dealer=dealer, logger=log, version="bench", transport="http", port=MCP_PORT)
+        kwargs = dict(dealer=dealer, logger=log, version="bench", transport="http", port=MCP_PORT)
+        if "on_ready" in inspect.signature(MCPBridge.__init__).parameters:   # v5
+            kwargs["on_ready"] = lambda: None
+        bridge = MCPBridge(**kwargs)
         tasks.append(asyncio.create_task(bridge.run()))
         tasks.append(asyncio.create_task(lag_probe()))
         await asyncio.sleep(1.5); ready.set()
