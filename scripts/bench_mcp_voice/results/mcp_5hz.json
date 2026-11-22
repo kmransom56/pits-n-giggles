@@ -1,0 +1,284 @@
+{
+ "client_session_open+list_tools": {
+  "n": 20,
+  "p50_ms": 20.59,
+  "p95_ms": 92.21,
+  "p99_ms": 261.95,
+  "mean_ms": 38.64,
+  "max_ms": 304.39
+ },
+ "tool_count": 11,
+ "tool:get_session_info": {
+  "n": 200,
+  "p50_ms": 22.19,
+  "p95_ms": 27.07,
+  "p99_ms": 45.37,
+  "mean_ms": 23.56,
+  "max_ms": 125.66,
+  "resp_bytes": 975
+ },
+ "tool:get_race_table": {
+  "n": 200,
+  "p50_ms": 50.29,
+  "p95_ms": 60.74,
+  "p99_ms": 84.81,
+  "mean_ms": 52.08,
+  "max_ms": 111.89,
+  "resp_bytes": 17954
+ },
+ "tool:get_drivers_list": {
+  "n": 200,
+  "p50_ms": 20.38,
+  "p95_ms": 24.47,
+  "p99_ms": 37.09,
+  "mean_ms": 21.94,
+  "max_ms": 158.69,
+  "resp_bytes": 3405
+ },
+ "tool:get_player_driver_info": {
+  "n": 200,
+  "p50_ms": 16.99,
+  "p95_ms": 20.38,
+  "p99_ms": 29.58,
+  "mean_ms": 17.89,
+  "max_ms": 50.63,
+  "resp_bytes": 410
+ },
+ "tool:get_player_tyre_wear": {
+  "n": 200,
+  "p50_ms": 15.79,
+  "p95_ms": 18.03,
+  "p99_ms": 28.11,
+  "mean_ms": 16.37,
+  "max_ms": 49.14,
+  "resp_bytes": 443
+ },
+ "tool:get_player_fuel_info": {
+  "n": 200,
+  "p50_ms": 14.38,
+  "p95_ms": 16.03,
+  "p99_ms": 24.09,
+  "mean_ms": 14.84,
+  "max_ms": 41.99,
+  "resp_bytes": 432
+ },
+ "tool:get_tyre_wear": {
+  "n": 200,
+  "p50_ms": 16.28,
+  "p95_ms": 22.85,
+  "p99_ms": 30.62,
+  "mean_ms": 17.68,
+  "max_ms": 151.84,
+  "resp_bytes": 441
+ },
+ "tool:get_fuel_info": {
+  "n": 200,
+  "p50_ms": 15.36,
+  "p95_ms": 18.39,
+  "p99_ms": 30.84,
+  "mean_ms": 15.95,
+  "max_ms": 44.07,
+  "resp_bytes": 432
+ },
+ "tool:get_driver_lap_times": {
+  "n": 200,
+  "p50_ms": 22.16,
+  "p95_ms": 27.28,
+  "p99_ms": 36.87,
+  "mean_ms": 23.0,
+  "max_ms": 47.73,
+  "resp_bytes": 3011
+ },
+ "tool:get_session_events_for_driver": {
+  "n": 200,
+  "p50_ms": 13.37,
+  "p95_ms": 15.68,
+  "p99_ms": 33.43,
+  "mean_ms": 14.56,
+  "max_ms": 129.43,
+  "resp_bytes": 93
+ },
+ "tool:get_car_damage": {
+  "n": 200,
+  "p50_ms": 30.59,
+  "p95_ms": 35.99,
+  "p99_ms": 49.01,
+  "mean_ms": 31.62,
+  "max_ms": 83.87,
+  "resp_bytes": 668
+ },
+ "voice_snapshot_4_parallel": {
+  "n": 100,
+  "p50_ms": 89.62,
+  "p95_ms": 112.32,
+  "p99_ms": 155.38,
+  "mean_ms": 94.12,
+  "max_ms": 176.7
+ },
+ "voice_adapter_3_sequential": {
+  "n": 100,
+  "p50_ms": 90.56,
+  "p95_ms": 118.17,
+  "p99_ms": 171.6,
+  "mean_ms": 95.72,
+  "max_ms": 184.03
+ },
+ "concurrency:1:get_race_table": {
+  "n": 60,
+  "p50_ms": 50.5,
+  "p95_ms": 60.5,
+  "p99_ms": 78.26,
+  "mean_ms": 52.47,
+  "max_ms": 95.67,
+  "throughput_rps": 19.0
+ },
+ "concurrency:4:get_race_table": {
+  "n": 240,
+  "p50_ms": 170.96,
+  "p95_ms": 217.42,
+  "p99_ms": 294.12,
+  "mean_ms": 174.96,
+  "max_ms": 324.5,
+  "throughput_rps": 22.6
+ },
+ "concurrency:16:get_race_table": {
+  "n": 960,
+  "p50_ms": 745.08,
+  "p95_ms": 882.66,
+  "p99_ms": 1021.06,
+  "mean_ms": 728.58,
+  "max_ms": 1141.72,
+  "throughput_rps": 21.6
+ },
+ "concurrency:1:get_car_damage(dealer)": {
+  "n": 50,
+  "p50_ms": 31.68,
+  "p95_ms": 37.95,
+  "p99_ms": 41.9,
+  "mean_ms": 32.64,
+  "max_ms": 43.42,
+  "throughput_rps": 30.3
+ },
+ "concurrency:8:get_car_damage(dealer)": {
+  "n": 400,
+  "p50_ms": 214.89,
+  "p95_ms": 266.22,
+  "p99_ms": 291.12,
+  "mean_ms": 207.44,
+  "max_ms": 294.8,
+  "throughput_rps": 37.5
+ },
+ "voice_direct:tyres": {
+  "n": 60,
+  "p50_ms": 113.73,
+  "p95_ms": 230.18,
+  "p99_ms": 269.7,
+  "mean_ms": 152.37,
+  "max_ms": 317.28,
+  "reasons": {
+   "None": 59,
+   "Incoherent session/player cache generation": 1
+  },
+  "sample_answer": "Current compound: Medium. Age 9 laps. FL 33.1% wear. FR 35.2% wear. RL 28% wear. RR 29.6% wear."
+ },
+ "voice_direct:fuel": {
+  "n": 60,
+  "p50_ms": 116.56,
+  "p95_ms": 234.06,
+  "p99_ms": 261.36,
+  "mean_ms": 156.77,
+  "max_ms": 273.49,
+  "reasons": {
+   "None": 60
+  },
+  "sample_answer": "Fuel remaining: 41.2 kg. Fuel surplus (game estimate): 0.8 laps."
+ },
+ "voice_direct:gaps": {
+  "n": 60,
+  "p50_ms": 94.39,
+  "p95_ms": 111.4,
+  "p99_ms": 133.79,
+  "mean_ms": 98.04,
+  "max_ms": 143.07,
+  "reasons": {
+   "None": 60
+  },
+  "sample_answer": "Driver4 is P5. Cannot report seconds or closing rate: same-lap timing compatibility is unavailable."
+ },
+ "ipc_subscriber_stats_6s": {
+  "__TOTAL__": {
+   "__PACKETS__": {
+    "type": "__PACKET__",
+    "count": 30,
+    "bytes": 1018863
+   },
+   "__LATENCY__": {
+    "type": "__LATENCY__",
+    "count": 30,
+    "bad_latency_count": 0,
+    "min_ns": 683342,
+    "max_ns": 1616620,
+    "avg_ns": 822863.4999999997,
+    "variance_ns": 52322049981.18331,
+    "stddev_ns": 228740.13635823363,
+    "p50_ns": 741326,
+    "p95_ns": 1415846,
+    "p99_ns": 1434361,
+    "jitter_avg_ns": 74121.89655172414,
+    "jitter_max_ns": 730710,
+    "ewma_ns": 802714.4656069066,
+    "tail_ratio": 1.9348586182057557
+   },
+   "__HANDLER_OK__": {
+    "type": "__COUNT__",
+    "count": 30
+   }
+  },
+  "race-table-update": {
+   "__PACKETS__": {
+    "type": "__PACKET__",
+    "count": 30,
+    "bytes": 1018863
+   },
+   "__LATENCY__": {
+    "type": "__LATENCY__",
+    "count": 30,
+    "bad_latency_count": 0,
+    "min_ns": 683342,
+    "max_ns": 1616620,
+    "avg_ns": 822863.4999999997,
+    "variance_ns": 52322049981.18331,
+    "stddev_ns": 228740.13635823363,
+    "p50_ns": 741326,
+    "p95_ns": 1415846,
+    "p99_ns": 1434361,
+    "jitter_avg_ns": 74121.89655172414,
+    "jitter_max_ns": 730710,
+    "ewma_ns": 802714.4656069066,
+    "tail_ratio": 1.9348586182057557
+   },
+   "__HANDLER_OK__": {
+    "type": "__COUNT__",
+    "count": 30
+   }
+  }
+ },
+ "ipc_interarrival_ms": {
+  "n": 29,
+  "p50_ms": 200.95,
+  "p95_ms": 201.18,
+  "p99_ms": 201.36,
+  "mean_ms": 200.94,
+  "max_ms": 201.43
+ },
+ "publish_rate_hz": 5.0,
+ "payload_bytes": 37864,
+ "mcp_loop_lag": {
+  "n": 6000,
+  "p50_ms": 0.26,
+  "p95_ms": 21.42,
+  "p99_ms": 146.82,
+  "mean_ms": 6.23,
+  "max_ms": 376.75
+ }
+}

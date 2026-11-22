@@ -1,0 +1,70 @@
+{
+ "voice_direct:tyres": {
+  "n": 80,
+  "p50_ms": 219.65,
+  "p95_ms": 246.81,
+  "p99_ms": 255.83,
+  "mean_ms": 220.92,
+  "max_ms": 256.26,
+  "success_rate": 0.025,
+  "ok_p50_ms": 109.4,
+  "reasons": {
+   "Incoherent session/player cache generation": 78,
+   "None": 2
+  },
+  "sample_answer": "Current compound: Medium. Age 9 laps. FL 33.1% wear. FR 35.2% wear. RL 28% wear. RR 29.6% wear."
+ },
+ "voice_direct:fuel": {
+  "n": 80,
+  "p50_ms": 219.46,
+  "p95_ms": 240.96,
+  "p99_ms": 295.75,
+  "mean_ms": 219.43,
+  "max_ms": 320.73,
+  "success_rate": 0.087,
+  "ok_p50_ms": 212.5,
+  "reasons": {
+   "Incoherent session/player cache generation": 73,
+   "None": 7
+  },
+  "sample_answer": "Fuel remaining: 41.2 kg. Fuel surplus (game estimate): 0.8 laps."
+ },
+ "voice_direct:gaps": {
+  "n": 80,
+  "p50_ms": 94.09,
+  "p95_ms": 111.11,
+  "p99_ms": 135.39,
+  "mean_ms": 97.93,
+  "max_ms": 194.4,
+  "success_rate": 1.0,
+  "ok_p50_ms": 94.1,
+  "reasons": {
+   "None": 80
+  },
+  "sample_answer": "Driver4 is P5. Cannot report seconds or closing rate: same-lap timing compatibility is unavailable."
+ },
+ "voice_direct:pit": {
+  "n": 80,
+  "p50_ms": 245.99,
+  "p95_ms": 281.42,
+  "p99_ms": 310.58,
+  "mean_ms": 251.93,
+  "max_ms": 350.22,
+  "success_rate": 0.0,
+  "ok_p50_ms": null,
+  "reasons": {
+   "Incoherent session/player cache generation": 80
+  },
+  "sample_answer": null
+ },
+ "publish_rate_hz": 20.0,
+ "payload_bytes": 37864,
+ "mcp_loop_lag": {
+  "n": 6000,
+  "p50_ms": 0.42,
+  "p95_ms": 13.33,
+  "p99_ms": 15.56,
+  "mean_ms": 2.16,
+  "max_ms": 120.65
+ }
+}
